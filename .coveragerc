@@ -1,6 +1,6 @@
 [run]
 branch = True
-source_pkgs = template
+source_pkgs = ctrlf
 
 [report]
 ; Regexes for lines to exclude from consideration
