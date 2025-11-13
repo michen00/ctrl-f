@@ -17,26 +17,31 @@ Sync Impact Report:
 ## Core Principles
 
 ### I. Test-First Development (NON-NEGOTIABLE)
+
 All features MUST follow Test-Driven Development (TDD) methodology. Tests MUST be written before implementation, approved by stakeholders, and verified to fail before code is written. The Red-Green-Refactor cycle is strictly enforced. All code MUST have corresponding tests with coverage requirements enforced by CI/CD.
 
 **Rationale**: Ensures code correctness, prevents regressions, and maintains high code quality standards throughout the project lifecycle.
 
 ### II. Type Safety & Static Analysis
+
 All code MUST pass strict type checking via mypy with strict mode enabled. Type hints are mandatory for all function signatures, class attributes, and module-level variables. Static analysis tools (ruff, pylint) MUST pass without errors before code can be merged.
 
 **Rationale**: Type safety catches errors at development time, improves code maintainability, and enhances IDE support for developers.
 
 ### III. CLI Interface Standard
+
 All functionality MUST be accessible via command-line interface using Typer. Commands MUST follow consistent patterns: structured output (JSON when appropriate), clear error messages to stderr, and human-readable formats. All scripts MUST be executable and properly documented.
 
 **Rationale**: CLI interfaces ensure the library is usable in automation, scripts, and various deployment scenarios without requiring Python imports.
 
 ### IV. Data Integrity & Validation
+
 All data processing operations MUST use Pandera for schema validation when working with Polars DataFrames. Data transformations MUST validate input schemas and output schemas. Invalid data MUST be rejected with clear error messages.
 
 **Rationale**: Data validation prevents silent failures, ensures data quality, and provides clear feedback when data doesn't meet expected schemas.
 
 ### V. Observability & Logging
+
 All operations MUST use structured logging via structlog. Logs MUST include contextual information (request IDs, operation names, timing). Log levels MUST be appropriate (DEBUG for development, INFO for operations, ERROR for failures). Critical operations MUST be logged with sufficient detail for debugging.
 
 **Rationale**: Structured logging enables effective debugging, monitoring, and operational visibility in production environments.
@@ -44,6 +49,7 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 ## Development Standards
 
 ### Code Quality
+
 - All code MUST pass pre-commit hooks (ruff, pylint, mypy) before commit
 - Code MUST follow PEP 8 style guidelines (enforced by ruff)
 - Maximum line length: 100 characters (configurable exceptions for URLs, long strings)
@@ -51,6 +57,7 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 - Private functions and classes MUST have inline comments explaining non-obvious logic
 
 ### Testing Requirements
+
 - Unit tests MUST cover all business logic with >80% coverage
 - Integration tests MUST cover all CLI commands and data processing workflows
 - Contract tests MUST validate data schemas and API contracts
@@ -58,6 +65,7 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 - All tests MUST pass in CI/CD before merge
 
 ### Documentation
+
 - README.md MUST include installation, basic usage, and examples
 - All public functions, classes, and modules MUST have docstrings
 - Complex algorithms or business logic MUST have inline comments
