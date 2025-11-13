@@ -125,6 +125,7 @@ Or create a zip/tar archive of documents.
 ### 5. View Results
 
 After submission, you'll see:
+
 - Summary: Number of fields resolved, nulls, disagreements
 - Record ID: Unique identifier for the saved record
 - Download JSON: Export the record as JSON file
@@ -164,6 +165,7 @@ After submission, you'll see:
 ### Null Policy
 
 Controls how empty fields are handled:
+
 - **Empty list** (default): `[]` for fields with no candidates
 - **Explicit null**: `[null]` for fields with no candidates
 
@@ -187,6 +189,7 @@ Check the error summary at the end of extraction for details.
 ## Data Storage
 
 Records are saved to TinyDB (local JSON database) in:
+
 - `~/.ctrlf/db/` (default location)
 - One table per schema (keyed by schema hash)
 - Records keyed by `record_id`
@@ -194,6 +197,7 @@ Records are saved to TinyDB (local JSON database) in:
 ## Exporting Data
 
 After saving a record:
+
 1. Click "Download JSON" button
 2. JSON file contains:
    - `resolved`: Final field values (arrays)

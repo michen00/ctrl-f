@@ -10,12 +10,14 @@
 **Decision**: Use markitdown library for converting documents (PDF, DOCX, HTML, TXT) to Markdown format.
 
 **Rationale**:
+
 - markitdown provides unified interface for multiple document formats
 - Preserves source location mapping (page/line information) which is critical for provenance tracking
 - Actively maintained and supports the formats required (PDF, DOCX, HTML, TXT)
 - Python-native, integrates well with existing stack
 
 **Alternatives considered**:
+
 - pdfplumber + python-docx + BeautifulSoup: Would require format-specific handling and custom source mapping logic
 - pandoc: More complex, requires external dependencies, less Python-native
 - Custom parsers: Too much development overhead for v0
@@ -25,12 +27,14 @@
 **Decision**: Use langextract library for extracting candidate values from documents based on schema fields.
 
 **Rationale**:
+
 - Designed for structured extraction from unstructured text
 - Supports grounding (source span tracking) which is mandatory requirement (FR-004)
 - Can work with field descriptions and type hints to build extraction queries
 - Returns confidence scores needed for consensus detection
 
 **Alternatives considered**:
+
 - Regex-only approach: Too brittle, doesn't handle variations well
 - LLM-based extraction: Would violate local-only requirement (FR-019), potential for fabrication
 - Custom NLP pipeline: Too complex for v0, langextract provides proven solution
@@ -40,6 +44,7 @@
 **Decision**: Use TheFuzz for candidate deduplication and similarity matching.
 
 **Rationale**:
+
 - Clean, Pythonic API for fuzzy string matching (wrapper around rapidfuzz)
 - Fast performance (uses rapidfuzz under the hood with C++ backend)
 - Well-established library (3.5k+ stars, used by 4.9k+ repositories)
@@ -49,6 +54,7 @@
 - MIT license, actively maintained
 
 **Alternatives considered**:
+
 - **rapidfuzz**: Fast but lower-level API. TheFuzz provides cleaner interface while using rapidfuzz internally.
 - **PolyFuzz**: More complex, designed for larger-scale matching tasks. Overkill for v0 deduplication needs.
 - **string2string**: Comprehensive but overkill for v0, more complex API
@@ -62,6 +68,7 @@
 **Decision**: Use TinyDB for local persistence of extracted records.
 
 **Rationale**:
+
 - Lightweight, file-based JSON database perfect for local-only requirement (FR-019)
 - No external dependencies or server setup
 - Simple API for storing structured data
@@ -69,6 +76,7 @@
 - Python-native, integrates seamlessly
 
 **Alternatives considered**:
+
 - SQLite: More complex, overkill for single-user local application
 - JSON files: No query/indexing capabilities, manual concurrency handling
 - PostgreSQL/MySQL: Violates local-only requirement, requires server setup
@@ -78,6 +86,7 @@
 **Decision**: Use Gradio for web-based user interface.
 
 **Rationale**:
+
 - Rapid prototyping and development of interactive UIs
 - Built-in support for file uploads, progress indicators, and dynamic components
 - Python-native, integrates with existing codebase
@@ -85,6 +94,7 @@
 - Can be run locally, satisfies local-only requirement
 
 **Alternatives considered**:
+
 - Streamlit: Less flexible for complex review interface, more opinionated
 - Flask/FastAPI + React: Too much development overhead for v0
 - CLI-only: Rejected - interactive review requires visual interface (see Constitution Check)
@@ -94,6 +104,7 @@
 **Decision**: Use Pydantic v2 for data models and validation, jsonschema for JSON Schema validation.
 
 **Rationale**:
+
 - Pydantic v2 provides excellent type safety and validation (constitution requirement)
 - Native support for JSON Schema conversion
 - Fast validation performance
@@ -101,6 +112,7 @@
 - jsonschema validates JSON Schema format before conversion
 
 **Alternatives considered**:
+
 - Pydantic v1: v2 has better performance and features
 - Marshmallow: Less type-safe, more verbose
 - Custom validation: Unnecessary when Pydantic provides comprehensive solution
@@ -112,6 +124,7 @@
 **Decision**: Coerce all schema fields to arrays (List[type]) for uniform handling.
 
 **Rationale**:
+
 - Simplifies extraction logic (always expect multiple candidates)
 - Aligns with requirement that fields can have multiple values from multiple sources
 - Makes validation consistent across all fields
@@ -124,6 +137,7 @@
 **Decision**: Every candidate value must include SourceRef with exact span location.
 
 **Rationale**:
+
 - Mandatory requirement (FR-004, FR-005) - zero fabrication
 - Enables user trust through verifiable source locations
 - Supports "View source" functionality in UI
@@ -136,6 +150,7 @@
 **Decision**: Use fixed thresholds (confidence ≥0.75, margin ≥0.20) for consensus detection.
 
 **Rationale**:
+
 - Provides clear, testable criteria (from clarifications)
 - Balances automation with accuracy
 - Reduces false positives while flagging ambiguous cases
@@ -148,6 +163,7 @@
 **Decision**: Continue processing on errors, show warnings inline, summarize at end.
 
 **Rationale**:
+
 - Maximizes value from partial results
 - User can see what succeeded and what failed
 - Aligns with graceful degradation requirement (FR-013)
@@ -162,6 +178,7 @@
 **Strategy**: Batch processing with parallelization by file where possible.
 
 **Rationale**:
+
 - markitdown conversion can be parallelized per document
 - Extraction can process documents independently
 - Progress tracking easier with batch approach
@@ -172,6 +189,7 @@
 **Decision**: Cache document conversions and extraction results keyed by corpus checksum + schema hash.
 
 **Rationale**:
+
 - Avoids reprocessing unchanged documents
 - Speeds up re-runs with same corpus/schema
 - Checksum-based invalidation ensures correctness
@@ -185,6 +203,7 @@
 **Decision**: All processing happens locally, no network transmission.
 
 **Rationale**:
+
 - Requirement FR-019 (local processing only)
 - Protects sensitive document content
 - No external dependencies or API calls
@@ -195,6 +214,7 @@
 **Decision**: Optional PII redaction in UI previews with user-configurable patterns.
 
 **Rationale**:
+
 - Requirement FR-020
 - Protects sensitive data in UI while preserving full data in storage
 - User control over what gets redacted
