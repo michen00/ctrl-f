@@ -6,7 +6,7 @@ breaking_always_bump_major = false
 
 [changelog]
 
-# header, body, and footer keys are Tera templates
+# header, body, and footer keys are Tera ctrlfs
 # https://keats.github.io/tera/docs/#introduction
 header = """
 <!-- markdownlint-configure-file { "no-duplicate-heading": false } -->\n
@@ -81,7 +81,7 @@ split_commits = false
 
 # RegEx-based parsers for modifying commit messages prior to further processing.
 commit_preprocessors = [
-    # Replace issue numbers with link templates to be updated in `changelog.postprocessors`.
+    # Replace issue numbers with link ctrlfs to be updated in `changelog.postprocessors`.
     # { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))" },
     # Check spelling of the commit message using https://github.com/crate-ci/typos.
     # If the spelling is incorrect, it will be fixed automatically.

@@ -1,7 +1,7 @@
 [project]
-name = "template"
+name = "ctrlf"
 version = "0.0.0"
-description = "template"
+description = "ctrlf"
 readme = "README.md"
 authors = [{ name = "Michael I Chen", email = "michael.chen.0@gmail.com" }]
 requires-python = ">=3.11"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-example-script = "template.example_script:main"
+example-script = "ctrlf.example_script:main"
 
 [dependency-groups]
 dev = [
@@ -39,7 +39,7 @@ default-groups = []
 package        = true
 
 [tool.uv.workspace]
-members = ["template"]
+members = ["ctrlf"]
 
 [tool.mypy]
 allow_redefinition = true
@@ -71,7 +71,7 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
-    "--cov=template",
+    "--cov=ctrlf",
     "--cov-report=term-missing",
 ]
 filterwarnings = ["error", "ignore::DeprecationWarning"]

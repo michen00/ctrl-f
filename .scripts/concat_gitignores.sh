@@ -8,8 +8,8 @@ usage() {
   cat << EOF
 Usage: $SCRIPT_NAME [--output <output_file>] [<input_file>]
 
-Concatenate multiple .gitignore templates into a single file by fetching
-template URLs from stdin, a file, or built-in defaults.
+Concatenate multiple .gitignore ctrlfs into a single file by fetching
+ctrlf URLs from stdin, a file, or built-in defaults.
 
 Inputs:
   stdin            Read URLs from standard input when piped.
@@ -110,7 +110,7 @@ HEADER=$(printf '#%.0s' $(seq 1 $HEADER_LENGTH))
 
 {
   echo "$HEADER"
-  echo "# This .gitignore is composed of the following templates (retrieved $(date +%Y-%m-%d)):"
+  echo "# This .gitignore is composed of the following ctrlfs (retrieved $(date +%Y-%m-%d)):"
   for url in "${URLS[@]}"; do
     echo "# - $url"
   done
@@ -131,7 +131,7 @@ for url in "${URLS[@]}"; do
   PREFACE_LENGTH=$((${#FILENAME} + 4)) # Length of " # FILENAME # "
   PREFACE=$(printf '#%.0s' $(seq 1 $PREFACE_LENGTH))
 
-  # Preface block for this template
+  # Preface block for this ctrlf
   {
     echo "$PREFACE"
     echo "# $FILENAME #"
