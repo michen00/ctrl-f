@@ -72,9 +72,9 @@ A user encounters situations where multiple documents contain conflicting values
 - What happens when extraction finds no candidates for any field in the schema? → No error; all fields show empty results, user can proceed to review interface and enter custom values or accept empty arrays per null policy
 - How does the system handle very large corpora (hundreds of documents) - does it process incrementally or require waiting? → Batch processing with progress indicator; process all documents before showing results, display progress during processing, allow user to cancel operation, show results when 100% complete
 - What happens when a user provides a schema with nested objects or arrays? → Not supported in v0; system must reject nested schemas with clear error message indicating only flat schemas (primitive types or arrays of primitives) are supported
-- How does the system handle fields that appear multiple times in the same document?
-- What happens when source location information (page/line) is unavailable for a document format?
-- How does the system handle special characters, encoding issues, or non-text content (images, tables) in documents?
+- How does the system handle fields that appear multiple times in the same document? → Collect all instances and create separate candidates; when there are disagreements, we need to know which sources say what
+- What happens when source location information (page/line) is unavailable for a document format? → When source info is missing, we still need to provide the best context we can that is usable for the user. We should fall back to something sensible when appropriate (e.g., char-range, document-level location, or section heading)
+- How does the system handle special characters, encoding issues, or non-text content (images, tables) in documents? → Special characters are preserved as-is (markitdown handles UTF-8 encoding). Encoding issues are handled by markitdown; if conversion fails due to encoding, treat as conversion error (covered by existing error handling). Images: Extract alt text if available in markdown, otherwise skip (cannot extract text from image content). Tables: Extract text from markdown table cells (markitdown converts tables to markdown format)
 
 ## Requirements _(mandatory)_
 
@@ -95,7 +95,7 @@ A user encounters situations where multiple documents contain conflicting values
 - **FR-013**: System MUST handle extraction errors gracefully - continue processing other documents/fields when one fails, show warnings inline during processing, and display a summary of errors at completion with failed items listed (document names, field names, error types)
 - **FR-014**: System MUST support schema fields as arrays (multiple values per field) in the final resolved record
 - **FR-015**: System MUST allow users to configure null policy (empty list vs explicit null placeholder) for fields with no candidates
-- **FR-016**: System MUST provide progress indicators during corpus processing and extraction phases (document count, percentage complete, estimated time remaining) and allow users to cancel processing operations
+- **FR-016**: System MUST provide progress indicators during corpus processing and extraction phases (document count, percentage complete, estimated time remaining [best-effort]) and allow users to cancel processing operations
 - **FR-017**: System MUST allow users to filter and search fields in the review interface (e.g., show only unresolved fields)
 - **FR-018**: System MUST export saved records in JSON format for download
 - **FR-019**: System MUST process all documents locally with no network transmission of document content or extracted data

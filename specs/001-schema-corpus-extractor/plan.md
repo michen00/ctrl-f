@@ -11,7 +11,7 @@ Build a schema-driven document extraction application that accepts JSON Schema o
 
 ## Technical Context
 
-**Language/Version**: Python 3.11+ (per project requirements)
+**Language/Version**: Python 3.12+ (per project requirements)
 **Primary Dependencies**:
 
 - pydantic>=2 (schema validation, data models)
@@ -196,7 +196,7 @@ User-facing quickstart guide created in `quickstart.md` with:
 
 ### Agent Context
 
-Agent context updated with Python 3.11+ and TinyDB technologies.
+Agent context updated with Python 3.12+ and TinyDB technologies.
 
 ## Constitution Check (Post-Design)
 
