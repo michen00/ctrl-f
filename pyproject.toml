@@ -38,9 +38,6 @@ test = ["coverage>=7.9.2", "pytest>=8.4.0", "pytest-cov>=6.2.1", "pytest-xdist>=
 default-groups = []
 package        = true
 
-[tool.uv.workspace]
-members = ["ctrlf"]
-
 [tool.mypy]
 allow_redefinition = true
 disable_error_code = ["import-untyped"]
