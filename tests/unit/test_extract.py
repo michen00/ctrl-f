@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from ctrlf.app.extract import extract_field_candidates, run_extraction
+from ctrlf.app.ingest import CorpusDocument
 from ctrlf.app.models import Candidate, ExtractionResult, SourceRef
 
 
@@ -103,11 +104,11 @@ class TestRunExtraction:
             name: list[str]
             email: list[str]
 
-        corpus_docs: list[tuple[str, str, dict[str, object]]] = [
-            (
-                "doc1",
-                "Name: Alice, Email: alice@example.com",
-                {"spans": {}},
+        corpus_docs = [
+            CorpusDocument(
+                doc_id="doc1",
+                markdown="Name: Alice, Email: alice@example.com",
+                source_map={"spans": {}},
             ),
         ]
 
@@ -126,9 +127,15 @@ class TestRunExtraction:
             name: list[str]
             email: list[str]
 
-        corpus_docs: list[tuple[str, str, dict[str, object]]] = [
-            ("doc1", "Valid content with name: Test", {"spans": {}}),
-            ("doc2", "", {"spans": {}}),  # Empty document
+        corpus_docs = [
+            CorpusDocument(
+                doc_id="doc1",
+                markdown="Valid content with name: Test",
+                source_map={"spans": {}},
+            ),
+            CorpusDocument(
+                doc_id="doc2", markdown="", source_map={"spans": {}}
+            ),  # Empty document
         ]
 
         # Should not raise, should continue processing

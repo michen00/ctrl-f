@@ -84,10 +84,10 @@ class TestProcessCorpus:
 
             results = process_corpus(str(test_dir))
             assert len(results) == 2
-            for doc_id, markdown, source_map in results:
-                assert isinstance(doc_id, str)
-                assert isinstance(markdown, str)
-                assert isinstance(source_map, dict)
+            for doc in results:
+                assert isinstance(doc.doc_id, str)
+                assert isinstance(doc.markdown, str)
+                assert isinstance(doc.source_map, dict)
 
     def test_process_nonexistent_path(self) -> None:
         """Test that ValueError is raised for nonexistent corpus path."""
