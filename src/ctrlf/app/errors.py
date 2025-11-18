@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 __all__ = (
     "DocumentError",
     "ErrorSummary",
@@ -12,6 +10,8 @@ __all__ = (
     "StorageError",
     "collect_errors",
 )
+
+from typing import Any
 
 
 class ExtractionError(Exception):

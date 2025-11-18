@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = "export_record", "get_storage_path", "save_record"
+
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -9,8 +11,6 @@ from tinydb import Query, TinyDB  # type: ignore[import-not-found]
 
 if TYPE_CHECKING:
     from ctrlf.app.models import PersistedRecord
-
-__all__ = ("export_record", "get_storage_path", "save_record")
 
 
 def get_storage_path() -> Path:

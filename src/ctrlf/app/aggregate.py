@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from thefuzz import fuzz  # type: ignore[import-not-found]
-
-from ctrlf.app.logging_conf import get_logger
-from ctrlf.app.models import Candidate, FieldResult
-
 __all__ = (
     "aggregate_field_results",
     "deduplicate_candidates",
     "detect_consensus",
     "normalize_value",
 )
+
+from thefuzz import fuzz  # type: ignore[import-not-found]
+
+from ctrlf.app.logging_conf import get_logger
+from ctrlf.app.models import Candidate, FieldResult
 
 logger = get_logger(__name__)
 

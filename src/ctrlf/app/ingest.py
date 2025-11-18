@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = "convert_document_to_markdown", "process_corpus"
+
 import hashlib
 import zipfile
 from pathlib import Path
@@ -13,8 +15,6 @@ from ctrlf.app.logging_conf import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-__all__ = ("convert_document_to_markdown", "process_corpus")
 
 logger = get_logger(__name__)
 md = MarkItDown()

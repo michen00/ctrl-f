@@ -111,8 +111,10 @@ repos:
             "--non-interactive",
           ]
         additional_dependencies:
+          - gradio
           - nox[uv]
           - pydantic[mypy]
           - pytest
+          - python-slugify
           - types-pyyaml
           - typer
