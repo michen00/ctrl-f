@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-__all__ = "convert_document_to_markdown", "process_corpus"
+__all__ = "CorpusDocument", "convert_document_to_markdown", "process_corpus"
 
 import hashlib
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from markitdown import MarkItDown  # type: ignore[import-not-found]
 
@@ -18,6 +18,20 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 md = MarkItDown()
+
+
+class CorpusDocument(NamedTuple):
+    """Represents a processed document from the corpus.
+
+    Attributes:
+        doc_id: Stable document identifier
+        markdown: Converted Markdown content
+        source_map: Source location mapping
+    """
+
+    doc_id: str
+    markdown: str
+    source_map: dict[str, Any]
 
 
 def _generate_doc_id(file_path: str) -> str:
@@ -118,10 +132,10 @@ def convert_document_to_markdown(
         return markdown_content, source_map
 
 
-def process_corpus(  # noqa: C901
+def process_corpus(
     corpus_path: str,
     progress_callback: Callable[[int, int], None] | None = None,
-) -> list[tuple[str, str, dict[str, Any]]]:
+) -> list[CorpusDocument]:
     """Process entire corpus, converting all documents to Markdown.
 
     Args:
@@ -139,7 +153,7 @@ def process_corpus(  # noqa: C901
         msg = f"Corpus path does not exist: {corpus_path}"
         raise ValueError(msg)
 
-    results: list[tuple[str, str, dict[str, Any]]] = []
+    results: list[CorpusDocument] = []
     files_to_process: list[Path] = []
 
     # Collect files to process
@@ -178,7 +192,9 @@ def process_corpus(  # noqa: C901
         try:
             markdown, source_map = convert_document_to_markdown(str(file_path))
             doc_id = _generate_doc_id(str(file_path))
-            results.append((doc_id, markdown, source_map))
+            results.append(
+                CorpusDocument(doc_id=doc_id, markdown=markdown, source_map=source_map)
+            )
 
             if progress_callback:
                 progress_callback(idx, total_files)

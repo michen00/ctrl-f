@@ -16,6 +16,8 @@ from ctrlf.app.models import Candidate, ExtractionResult, FieldResult, SourceRef
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
+    from ctrlf.app.ingest import CorpusDocument
+
 logger = get_logger(__name__)
 
 
@@ -192,13 +194,13 @@ def _extract_location_from_source_map(
 
 def run_extraction(
     model: type[BaseModel],
-    corpus_docs: list[tuple[str, str, dict[str, Any]]],
+    corpus_docs: list[CorpusDocument],
 ) -> ExtractionResult:
     """Run extraction for all fields across all documents.
 
     Args:
         model: Extended Pydantic model (all fields as arrays)
-        corpus_docs: List of (doc_id, markdown, source_map)
+        corpus_docs: List of CorpusDocument instances
 
     Returns:
         Complete extraction results with all field results
@@ -213,7 +215,7 @@ def run_extraction(
     field_info = model.model_fields
 
     # Extract candidates for each field from each document
-    for doc_id, markdown, source_map in corpus_docs:
+    for doc in corpus_docs:
         for field_name, field_info_obj in field_info.items():
             # Get field type (should be List[type] in Extended Schema)
             field_type = field_info_obj.annotation
@@ -231,9 +233,9 @@ def run_extraction(
                 field_name=field_name,
                 field_type=inner_type,
                 field_description=field_description,
-                markdown_content=markdown,
-                doc_id=doc_id,
-                source_map=source_map,
+                markdown_content=doc.markdown,
+                doc_id=doc.doc_id,
+                source_map=doc.source_map,
             )
 
             # Add to field candidates

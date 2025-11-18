@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-__all__ = "create_review_interface", "create_upload_interface", "show_source_context"
+__all__ = (
+    "ExtractionWorkflowResult",
+    "create_review_interface",
+    "create_upload_interface",
+    "show_source_context",
+)
 
 import shutil
 import tarfile
@@ -12,7 +17,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from inspect import cleandoc
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import gradio as gr
 from slugify import slugify
@@ -32,6 +37,22 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+
+
+class ExtractionWorkflowResult(NamedTuple):
+    """Result of extraction workflow execution.
+
+    Attributes:
+        progress_message: Progress status message
+        error_message: Error message (empty if no errors)
+        extraction_result: Extraction result or None if failed
+        error_visibility: Gradio update for error visibility
+    """
+
+    progress_message: str
+    error_message: str
+    extraction_result: ExtractionResult | None
+    error_visibility: Any
 
 
 def _safe_snippet(snippet: str) -> str:
@@ -146,7 +167,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             _null_policy_str: str,
             _confidence: float,
             _progress: gr.Progress,
-        ) -> tuple[str, str, ExtractionResult | None, Any]:
+        ) -> ExtractionWorkflowResult:
             """Run the extraction workflow.
 
             Args:
@@ -159,8 +180,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 _progress: Gradio progress tracker (unused)
 
             Returns:
-                Tuple of (progress_message, error_message,
-                    extraction_result, error_visibility)
+                ExtractionWorkflowResult with progress, error, result, and visibility
             """
             error_summary = ErrorSummary()
             progress_messages: list[str] = []
@@ -242,11 +262,11 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 progress_messages.append("Extraction complete.")
 
                 progress_msg = "\n".join(progress_messages)
-                return (
-                    progress_msg,
-                    "",
-                    extraction_result,
-                    gr.update(visible=False),
+                return ExtractionWorkflowResult(
+                    progress_message=progress_msg,
+                    error_message="",
+                    extraction_result=extraction_result,
+                    error_visibility=gr.update(visible=False),
                 )
 
             except Exception as e:
@@ -259,15 +279,33 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 error_msg = error_summary.get_summary()
                 progress_msg = "\n".join(progress_messages)
                 logger.exception("Extraction workflow failed")
-                return (
-                    progress_msg,
-                    error_msg,
-                    None,
-                    gr.update(visible=True),
+                return ExtractionWorkflowResult(
+                    progress_message=progress_msg,
+                    error_message=error_msg,
+                    extraction_result=None,
+                    error_visibility=gr.update(visible=True),
                 )
 
+        def unpack_result(
+            result: ExtractionWorkflowResult,
+        ) -> tuple[str, str, ExtractionResult | None, Any]:
+            """Unpack ExtractionWorkflowResult for Gradio outputs.
+
+            Args:
+                result: Extraction workflow result
+
+            Returns:
+                Tuple unpacked for Gradio outputs
+            """
+            return (
+                result.progress_message,
+                result.error_message,
+                result.extraction_result,
+                result.error_visibility,
+            )
+
         run_button.click(
-            fn=run_extraction_workflow,
+            fn=lambda *args: unpack_result(run_extraction_workflow(*args)),
             inputs=[
                 schema_file,
                 schema_type,
@@ -287,7 +325,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
     return interface  # type: ignore[no-any-return]
 
 
-def create_review_interface(  # noqa: C901, PLR0915
+def create_review_interface(  # noqa: PLR0915, C901
     extraction_result: ExtractionResult,
     extraction_result_state: gr.State,
 ) -> gr.Blocks:
