@@ -76,7 +76,7 @@ class TestDeduplicateCandidates:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
@@ -101,7 +101,7 @@ class TestDetectConsensus:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
@@ -121,7 +121,7 @@ class TestDetectConsensus:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
@@ -140,7 +140,7 @@ class TestDetectConsensus:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
@@ -165,7 +165,7 @@ class TestAggregateFieldResults:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
@@ -184,7 +184,7 @@ class TestAggregateFieldResults:
             doc_id="doc1",
             path="doc1.txt",
             location="line 1",
-            snippet="Test",
+            snippet="Test snippet for validation",
         )
 
         candidates = [
