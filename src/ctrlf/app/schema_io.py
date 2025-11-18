@@ -93,6 +93,8 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
         SchemaError: If code is invalid Python, model cannot be imported,
             or contains nested structures
     """
+    model_class: type[BaseModel] | None = None
+    module_added = False
     try:
         # Create a temporary module
         spec = importlib.util.spec_from_loader("temp_model", loader=None)
@@ -102,12 +104,12 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
 
         module = importlib.util.module_from_spec(spec)
         sys.modules["temp_model"] = module
+        module_added = True
 
         # Execute the code
-        exec(code, module.__dict__)  # noqa: S102
+        exec(code, module.__dict__)  # noqa: S102  # nosec B102
 
         # Find the BaseModel subclass
-        model_class = None
         for name in dir(module):
             obj = getattr(module, name)
             if (
@@ -128,16 +130,25 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
         # This is a simplified check - full validation would require
         # inspecting field types
         # TODO: Implement full nested structure detection  # noqa: FIX002
+    except SchemaError:
+        # Re-raise SchemaError directly to preserve original error context
+        raise
     except SyntaxError as e:
         msg = f"Invalid Python syntax: {e}"
         raise SchemaError(msg) from e
     except Exception as e:
+        # Only catch unexpected exceptions, not intentionally raised SchemaErrors
         msg = f"Failed to import model: {e}"
         raise SchemaError(msg) from e
-    else:
-        # Clean up and return on success
-        del sys.modules["temp_model"]
-        return model_class
+    finally:
+        # Always clean up the temporary module to prevent namespace pollution
+        if module_added and "temp_model" in sys.modules:
+            del sys.modules["temp_model"]
+
+    # Return the model class after cleanup
+    # Note: model_class guaranteed to be set (would have raised earlier)
+    assert model_class is not None, "Model class not found"  # noqa: S101  # nosec B101
+    return model_class
 
 
 def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
