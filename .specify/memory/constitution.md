@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report:
-- Version change: N/A → 1.0.0 (initial constitution)
-- Modified principles: N/A (new file)
-- Added sections: Core Principles (5 principles), Development Standards, Governance
+- Version change: 1.0.0 → 1.0.1 (PATCH: clarification of Principle II)
+- Modified principles: II. Type Safety & Static Analysis (updated to reference make format-all)
+- Added sections: N/A
 - Removed sections: N/A
 - Templates requiring updates:
   ✅ plan-template.md - Constitution Check section exists and aligns
@@ -24,9 +24,9 @@ All features MUST follow Test-Driven Development (TDD) methodology. Tests MUST b
 
 ### II. Type Safety & Static Analysis
 
-All code MUST pass strict type checking via mypy with strict mode enabled. Type hints are mandatory for all function signatures, class attributes, and module-level variables. Static analysis tools (ruff, pylint) MUST pass without errors before code can be merged.
+All code MUST pass `make format-all` which enforces type checking (mypy with strict mode enabled) and static analysis (ruff, pylint via pre-commit/prek). Type hints are mandatory for all function signatures, class attributes, and module-level variables. All linting and type checking MUST pass without errors before code can be merged.
 
-**Rationale**: Type safety catches errors at development time, improves code maintainability, and enhances IDE support for developers.
+**Rationale**: Type safety catches errors at development time, improves code maintainability, and enhances IDE support for developers. Using `make format-all` ensures consistent enforcement across all code quality checks.
 
 ### III. CLI Interface Standard
 
@@ -50,7 +50,7 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 
 ### Code Quality
 
-- All code MUST pass pre-commit hooks (ruff, pylint, mypy) before commit
+- All code MUST pass `make format-all` before commit (runs ruff, pylint, mypy via pre-commit/prek)
 - Code MUST follow PEP 8 style guidelines (enforced by ruff)
 - Maximum line length: 100 characters (configurable exceptions for URLs, long strings)
 - All public APIs MUST have docstrings following Google or NumPy style
@@ -86,4 +86,4 @@ This constitution supersedes all other development practices and guidelines. All
 
 Complexity additions MUST be justified. When a principle violation is necessary, it MUST be documented in the implementation plan with rationale and simpler alternatives considered.
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-12
+**Version**: 1.0.1 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-18

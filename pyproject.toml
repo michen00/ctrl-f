@@ -4,8 +4,12 @@ version = "0.0.0"
 description = "ctrlf"
 readme = "README.md"
 authors = [{ name = "Michael I Chen", email = "michael.chen.0@gmail.com" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
+    "gradio>=4.0.0",
+    "jsonschema>=4.0.0",
+    "langextract>=0.1.0",
+    "markitdown>=0.0.1",
     "nox[uv]>=2025.10.14",
     "numpy>=2.3.4",
     "pandera[polars]>=0.25.0",
@@ -13,9 +17,12 @@ dependencies = [
     "polars>=1.32.2",
     "pydantic-settings>=2.10.1",
     "pydantic>=2.12.2",
+    "python-slugify>=8.0.0",
     "pyyaml>=6.0.2",
     "rich-argparse>=1.7.1",
     "structlog>=25.4.0",
+    "thefuzz>=0.22.0",
+    "tinydb>=4.8.0",
     "typer>=0.16.0",
     "yapic-json>=1.9.5",
 ]
