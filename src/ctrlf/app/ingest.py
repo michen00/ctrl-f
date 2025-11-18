@@ -179,10 +179,9 @@ def process_corpus(
             # Single file
             files_to_process.append(path)
     elif path.is_dir():
-        # Directory of files
+        # Directory of files (recursive search)
         for ext in ["*.pdf", "*.docx", "*.html", "*.htm", "*.txt", "*.md"]:
-            files_to_process.extend(path.glob(ext))
-            files_to_process.extend(path.glob(f"**/{ext}"))
+            files_to_process.extend(path.rglob(ext))
 
     total_files = len(files_to_process)
     logger.info("corpus_processing_started", total_files=total_files)

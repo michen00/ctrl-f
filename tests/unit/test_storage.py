@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import ctrlf.app.storage as storage_module
 from ctrlf.app.models import PersistedRecord, SourceRef
 from ctrlf.app.storage import export_record, save_record
 
@@ -50,8 +51,6 @@ class TestSaveRecord:
             )
 
             # Temporarily override storage path for testing
-            import ctrlf.app.storage as storage_module  # noqa: PLC0415
-
             original_get_path = storage_module.get_storage_path
             storage_module.get_storage_path = lambda: storage_path
             try:
@@ -61,26 +60,15 @@ class TestSaveRecord:
             assert record_id == "test-record-1"
 
     def test_save_record_validation_failure(self) -> None:
-        """Test that ValueError is raised for invalid records."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            storage_path = Path(tmpdir)
-            # Invalid record (missing required fields)
-            invalid_record = PersistedRecord(
+        """Test that ValidationError is raised for invalid records."""
+        # Invalid record (empty record_id) - Pydantic validates at construction time
+        with pytest.raises(ValueError, match=r".*"):
+            PersistedRecord(
                 record_id="",
                 resolved={},
                 provenance={},
                 audit={},
             )
-
-            import ctrlf.app.storage as storage_module  # noqa: PLC0415
-
-            original_get_path = storage_module.get_storage_path
-            storage_module.get_storage_path = lambda: storage_path
-            try:
-                with pytest.raises(ValueError, match=r".*"):
-                    save_record(invalid_record)
-            finally:
-                storage_module.get_storage_path = original_get_path
 
 
 class TestExportRecord:
@@ -112,8 +100,6 @@ class TestExportRecord:
                 },
             )
 
-            import ctrlf.app.storage as storage_module  # noqa: PLC0415
-
             original_get_path = storage_module.get_storage_path
             storage_module.get_storage_path = lambda: storage_path
             try:
@@ -129,8 +115,6 @@ class TestExportRecord:
         """Test that KeyError is raised for nonexistent records."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage_path = Path(tmpdir)
-            import ctrlf.app.storage as storage_module  # noqa: PLC0415
-
             original_get_path = storage_module.get_storage_path
             storage_module.get_storage_path = lambda: storage_path
             try:
