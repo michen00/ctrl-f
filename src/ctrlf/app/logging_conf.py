@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+__all__ = "configure_logging", "get_logger"
+
 import logging
 import sys
 
 import structlog  # type: ignore[import-not-found]
-
-__all__ = ("configure_logging", "get_logger")
 
 
 def configure_logging(level: str = "INFO") -> None:

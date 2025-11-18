@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+__all__ = (
+    "convert_json_schema_to_pydantic",
+    "extend_schema",
+    "import_pydantic_model",
+    "validate_json_schema",
+)
+
 import importlib.util
 import json
 import sys
@@ -11,13 +18,6 @@ import jsonschema
 from pydantic import BaseModel
 
 from ctrlf.app.errors import SchemaError
-
-__all__ = (
-    "convert_json_schema_to_pydantic",
-    "extend_schema",
-    "import_pydantic_model",
-    "validate_json_schema",
-)
 
 
 def validate_json_schema(schema_json: str) -> dict[str, Any]:

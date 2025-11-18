@@ -69,7 +69,7 @@ description: "Task list template for feature implementation"
 - [x] T015 [P] [US1] Unit test for field extraction in tests/unit/test_extract.py
 - [x] T016 [P] [US1] Unit test for candidate aggregation in tests/unit/test_aggregate.py
 - [x] T017 [P] [US1] Unit test for storage operations in tests/unit/test_storage.py
-- [ ] T018 [US1] Integration test for full extraction workflow in tests/integration/test_end_to_end.py
+- [x] T018 [US1] Integration test for full extraction workflow in tests/integration/test_end_to_end.py
 
 ### Implementation for User Story 1
 
@@ -89,12 +89,12 @@ description: "Task list template for feature implementation"
 - [x] T032 [US1] Implement aggregate_field_results function in src/ctrlf/app/aggregate.py (depends on T021, T029, T030, T031)
 - [x] T033 [US1] Implement save_record function in src/ctrlf/app/storage.py (depends on T024)
 - [x] T034 [US1] Implement export_record function in src/ctrlf/app/storage.py (depends on T033)
-- [ ] T035 [US1] Create upload interface in src/ctrlf/app/ui.py (depends on T026, T028)
-- [ ] T036 [US1] Create review interface in src/ctrlf/app/ui.py (depends on T032, T035)
-- [ ] T037 [US1] Implement show_source_context function in src/ctrlf/app/ui.py (depends on T019)
-- [ ] T038 [US1] Create main server entrypoint in src/ctrlf/app/server.py (depends on T035, T036)
-- [ ] T039 [US1] Add error handling and progress indicators to UI (depends on T007, T035, T036)
-- [ ] T040 [US1] Add validation before saving records (depends on T032, T033)
+- [x] T035 [US1] Create upload interface in src/ctrlf/app/ui.py (depends on T026, T028)
+- [x] T036 [US1] Create review interface in src/ctrlf/app/ui.py (depends on T032, T035)
+- [x] T037 [US1] Implement show_source_context function in src/ctrlf/app/ui.py (depends on T019)
+- [x] T038 [US1] Create main server entrypoint in src/ctrlf/app/server.py (depends on T035, T036)
+- [x] T039 [US1] Add error handling and progress indicators to UI (depends on T007, T035, T036)
+- [x] T040 [US1] Add validation before saving records (depends on T032, T033)
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 

@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
-
 __all__ = (
     "Candidate",
     "ExtractionResult",
@@ -14,6 +10,10 @@ __all__ = (
     "Resolution",
     "SourceRef",
 )
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class SourceRef(BaseModel):

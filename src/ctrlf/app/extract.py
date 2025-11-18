@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__all__ = "extract_field_candidates", "run_extraction"
+
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -13,8 +15,6 @@ from ctrlf.app.models import Candidate, ExtractionResult, FieldResult, SourceRef
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
-
-__all__ = ("extract_field_candidates", "run_extraction")
 
 logger = get_logger(__name__)
 

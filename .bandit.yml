@@ -5,5 +5,6 @@ assert_used:
     - ./**/test_*.py
     - ./tests/**
 skips:
-  - B102  # exec_used - intentional for Pydantic model import
-  - B324  # hashlib - MD5 used for stable doc ID generation, not security
+  - B102 # exec_used - intentional for Pydantic model import
+  - B202 # tarfile.extractall - used in temp directory with user-provided archives
+  - B324 # hashlib - MD5 used for stable doc ID generation, not security
