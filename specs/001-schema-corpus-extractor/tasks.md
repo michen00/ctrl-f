@@ -61,10 +61,10 @@ description: "Task list template for feature implementation"
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T010 [P] [US1] Unit test for SourceRef model validation in tests/unit/test_models.py
-- [ ] T011 [P] [US1] Unit test for Candidate model validation in tests/unit/test_models.py
-- [ ] T012 [P] [US1] Unit test for FieldResult model validation in tests/unit/test_models.py
-- [ ] T013 [P] [US1] Unit test for ExtractionResult model validation in tests/unit/test_models.py
+- [x] T010 [P] [US1] Unit test for SourceRef model validation in tests/unit/test_models.py
+- [x] T011 [P] [US1] Unit test for Candidate model validation in tests/unit/test_models.py
+- [x] T012 [P] [US1] Unit test for FieldResult model validation in tests/unit/test_models.py
+- [x] T013 [P] [US1] Unit test for ExtractionResult model validation in tests/unit/test_models.py
 - [ ] T014 [P] [US1] Unit test for document conversion in tests/unit/test_ingest.py
 - [ ] T015 [P] [US1] Unit test for field extraction in tests/unit/test_extract.py
 - [ ] T016 [P] [US1] Unit test for candidate aggregation in tests/unit/test_aggregate.py
@@ -73,12 +73,12 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Implement SourceRef model in src/ctrlf/app/models.py
-- [ ] T020 [P] [US1] Implement Candidate model in src/ctrlf/app/models.py
-- [ ] T021 [P] [US1] Implement FieldResult model in src/ctrlf/app/models.py
-- [ ] T022 [P] [US1] Implement ExtractionResult model in src/ctrlf/app/models.py
-- [ ] T023 [P] [US1] Implement Resolution model in src/ctrlf/app/models.py
-- [ ] T024 [P] [US1] Implement PersistedRecord model in src/ctrlf/app/models.py
+- [x] T019 [P] [US1] Implement SourceRef model in src/ctrlf/app/models.py
+- [x] T020 [P] [US1] Implement Candidate model in src/ctrlf/app/models.py
+- [x] T021 [P] [US1] Implement FieldResult model in src/ctrlf/app/models.py
+- [x] T022 [P] [US1] Implement ExtractionResult model in src/ctrlf/app/models.py
+- [x] T023 [P] [US1] Implement Resolution model in src/ctrlf/app/models.py
+- [x] T024 [P] [US1] Implement PersistedRecord model in src/ctrlf/app/models.py
 - [ ] T025 [US1] Implement convert_document_to_markdown function in src/ctrlf/app/ingest.py (depends on T005)
 - [ ] T026 [US1] Implement process_corpus function in src/ctrlf/app/ingest.py (depends on T025)
 - [ ] T027 [US1] Implement extract_field_candidates function in src/ctrlf/app/extract.py (depends on T019, T020)
@@ -87,8 +87,8 @@ description: "Task list template for feature implementation"
 - [ ] T030 [US1] Implement deduplicate_candidates function in src/ctrlf/app/aggregate.py (depends on T020, T029)
 - [ ] T031 [US1] Implement detect_consensus function in src/ctrlf/app/aggregate.py (depends on T020)
 - [ ] T032 [US1] Implement aggregate_field_results function in src/ctrlf/app/aggregate.py (depends on T021, T029, T030, T031)
-- [ ] T033 [US1] Implement save_record function in src/ctrlf/app/storage.py (depends on T024)
-- [ ] T034 [US1] Implement export_record function in src/ctrlf/app/storage.py (depends on T033)
+- [x] T033 [US1] Implement save_record function in src/ctrlf/app/storage.py (depends on T024)
+- [x] T034 [US1] Implement export_record function in src/ctrlf/app/storage.py (depends on T033)
 - [ ] T035 [US1] Create upload interface in src/ctrlf/app/ui.py (depends on T026, T028)
 - [ ] T036 [US1] Create review interface in src/ctrlf/app/ui.py (depends on T032, T035)
 - [ ] T037 [US1] Implement show_source_context function in src/ctrlf/app/ui.py (depends on T019)
@@ -119,9 +119,9 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T047 [US2] Implement validate_json_schema function in src/ctrlf/app/schema_io.py (depends on T009)
+- [x] T047 [US2] Implement validate_json_schema function in src/ctrlf/app/schema_io.py (depends on T009)
 - [ ] T048 [US2] Implement convert_json_schema_to_pydantic function in src/ctrlf/app/schema_io.py (depends on T047)
-- [ ] T049 [US2] Implement import_pydantic_model function in src/ctrlf/app/schema_io.py (depends on T009)
+- [x] T049 [US2] Implement import_pydantic_model function in src/ctrlf/app/schema_io.py (depends on T009)
 - [ ] T050 [US2] Implement extend_schema function in src/ctrlf/app/schema_io.py (depends on T048, T049)
 - [ ] T051 [US2] Add schema format detection to upload interface in src/ctrlf/app/ui.py (depends on T035, T047, T049)
 - [ ] T052 [US2] Add "Other" text input option to review interface in src/ctrlf/app/ui.py (depends on T036)
@@ -173,8 +173,8 @@ description: "Task list template for feature implementation"
 - [ ] T071 [P] Update README.md with installation and usage instructions
 - [ ] T072 [P] Add docstrings to all public functions and classes
 - [ ] T073 Code cleanup and refactoring
-- [ ] T074 [P] Performance optimization across all modules
-- [ ] T075 [P] Additional unit tests for edge cases in tests/unit/
+- [ ] T074 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
+- [ ] T075 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
 - [ ] T076 Run quickstart.md validation
 
 ---

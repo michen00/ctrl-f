@@ -108,15 +108,16 @@ Converts a document to Markdown and returns source mapping.
 - `Tuple[str, Dict[str, Any]]` - (markdown_content, source_map)
   - `markdown_content: str` - Converted Markdown text
   - `source_map: Dict[str, Any]` - Mapping of Markdown positions to original locations (page/line/char ranges)
+  - When page/line unavailable: Falls back to char-range, document-level location, or section heading
 
 **Errors**:
 
 - Raises `FileNotFoundError` if file doesn't exist
 - Raises `ValueError` if file format is unsupported
-- Raises `RuntimeError` if conversion fails (corrupted file)
+- Raises `RuntimeError` if conversion fails (corrupted file or encoding error)
 
 **Preconditions**: File exists and is readable
-**Postconditions**: Markdown preserves content, source_map enables span mapping
+**Postconditions**: Markdown preserves content, source_map enables span mapping with best-available location info
 
 ---
 
@@ -161,6 +162,8 @@ Extracts candidate values for a single field from a single document.
 **Outputs**:
 
 - `List[Candidate]` - List of candidate values with confidence scores and source references
+  - Multiple occurrences in same document: Creates separate candidates for each occurrence
+  - Each candidate has distinct source reference to enable disagreement tracking
 
 **Errors**:
 
