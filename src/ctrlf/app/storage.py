@@ -47,6 +47,7 @@ def save_record(record: PersistedRecord, table_name: str | None = None) -> str:
     storage_path = get_storage_path()
     db_file = storage_path / f"{table_name}.json"
 
+    db: TinyDB | None = None
     try:
         db = TinyDB(str(db_file))
         table = db.table("records")
@@ -56,13 +57,14 @@ def save_record(record: PersistedRecord, table_name: str | None = None) -> str:
 
         # Insert record (TinyDB will use record_id as doc_id)
         table.insert(record_dict)
-        db.close()
     except Exception as e:
-        db.close()
         msg = f"Failed to save record to database: {e}"
         raise RuntimeError(msg) from e
-    else:
-        return record.record_id
+    finally:
+        if db is not None:
+            db.close()
+
+    return record.record_id
 
 
 def export_record(record_id: str, table_name: str | None = None) -> dict[str, Any]:

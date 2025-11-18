@@ -65,10 +65,10 @@ description: "Task list template for feature implementation"
 - [x] T011 [P] [US1] Unit test for Candidate model validation in tests/unit/test_models.py
 - [x] T012 [P] [US1] Unit test for FieldResult model validation in tests/unit/test_models.py
 - [x] T013 [P] [US1] Unit test for ExtractionResult model validation in tests/unit/test_models.py
-- [ ] T014 [P] [US1] Unit test for document conversion in tests/unit/test_ingest.py
-- [ ] T015 [P] [US1] Unit test for field extraction in tests/unit/test_extract.py
-- [ ] T016 [P] [US1] Unit test for candidate aggregation in tests/unit/test_aggregate.py
-- [ ] T017 [P] [US1] Unit test for storage operations in tests/unit/test_storage.py
+- [x] T014 [P] [US1] Unit test for document conversion in tests/unit/test_ingest.py
+- [x] T015 [P] [US1] Unit test for field extraction in tests/unit/test_extract.py
+- [x] T016 [P] [US1] Unit test for candidate aggregation in tests/unit/test_aggregate.py
+- [x] T017 [P] [US1] Unit test for storage operations in tests/unit/test_storage.py
 - [ ] T018 [US1] Integration test for full extraction workflow in tests/integration/test_end_to_end.py
 
 ### Implementation for User Story 1
@@ -79,14 +79,14 @@ description: "Task list template for feature implementation"
 - [x] T022 [P] [US1] Implement ExtractionResult model in src/ctrlf/app/models.py
 - [x] T023 [P] [US1] Implement Resolution model in src/ctrlf/app/models.py
 - [x] T024 [P] [US1] Implement PersistedRecord model in src/ctrlf/app/models.py
-- [ ] T025 [US1] Implement convert_document_to_markdown function in src/ctrlf/app/ingest.py (depends on T005)
-- [ ] T026 [US1] Implement process_corpus function in src/ctrlf/app/ingest.py (depends on T025)
-- [ ] T027 [US1] Implement extract_field_candidates function in src/ctrlf/app/extract.py (depends on T019, T020)
-- [ ] T028 [US1] Implement run_extraction function in src/ctrlf/app/extract.py (depends on T027)
-- [ ] T029 [US1] Implement normalize_value function in src/ctrlf/app/aggregate.py (depends on T020)
-- [ ] T030 [US1] Implement deduplicate_candidates function in src/ctrlf/app/aggregate.py (depends on T020, T029)
-- [ ] T031 [US1] Implement detect_consensus function in src/ctrlf/app/aggregate.py (depends on T020)
-- [ ] T032 [US1] Implement aggregate_field_results function in src/ctrlf/app/aggregate.py (depends on T021, T029, T030, T031)
+- [x] T025 [US1] Implement convert_document_to_markdown function in src/ctrlf/app/ingest.py (depends on T005)
+- [x] T026 [US1] Implement process_corpus function in src/ctrlf/app/ingest.py (depends on T025)
+- [x] T027 [US1] Implement extract_field_candidates function in src/ctrlf/app/extract.py (depends on T019, T020)
+- [x] T028 [US1] Implement run_extraction function in src/ctrlf/app/extract.py (depends on T027)
+- [x] T029 [US1] Implement normalize_value function in src/ctrlf/app/aggregate.py (depends on T020)
+- [x] T030 [US1] Implement deduplicate_candidates function in src/ctrlf/app/aggregate.py (depends on T020, T029)
+- [x] T031 [US1] Implement detect_consensus function in src/ctrlf/app/aggregate.py (depends on T020)
+- [x] T032 [US1] Implement aggregate_field_results function in src/ctrlf/app/aggregate.py (depends on T021, T029, T030, T031)
 - [x] T033 [US1] Implement save_record function in src/ctrlf/app/storage.py (depends on T024)
 - [x] T034 [US1] Implement export_record function in src/ctrlf/app/storage.py (depends on T033)
 - [ ] T035 [US1] Create upload interface in src/ctrlf/app/ui.py (depends on T026, T028)
