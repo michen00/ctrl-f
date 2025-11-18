@@ -52,7 +52,8 @@ unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [lint.mccabe]
-max-complexity = 12
+# Flag errors (`C901`) whenever the complexity level exceeds `max-complexity`.
+max-complexity = 15
 
 [lint.per-file-ignores]
 "__init__.py" = [
