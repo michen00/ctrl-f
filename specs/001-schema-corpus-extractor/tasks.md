@@ -28,10 +28,10 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project structure per implementation plan (src/ctrlf/app/, tests/unit/, tests/integration/, tests/contract/)
-- [ ] T002 Update pyproject.toml with dependencies: pydantic>=2, gradio, tinydb, markitdown, langextract, thefuzz, python-slugify, structlog, jsonschema
-- [ ] T003 [P] Configure linting and formatting tools (ruff, pylint, mypy) in pyproject.toml
-- [ ] T004 [P] Setup pytest configuration in pyproject.toml with coverage settings
+- [x] T001 Create project structure per implementation plan (src/ctrlf/app/, tests/unit/, tests/integration/, tests/contract/)
+- [x] T002 Update pyproject.toml with dependencies: pydantic>=2, gradio, tinydb, markitdown, langextract, thefuzz, python-slugify, structlog, jsonschema
+- [x] T003 [P] Configure linting and formatting tools (ruff, pylint, mypy) in pyproject.toml
+- [x] T004 [P] Setup pytest configuration in pyproject.toml with coverage settings
 
 ---
 
@@ -41,11 +41,11 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 [P] Create structlog configuration in src/ctrlf/app/logging_conf.py
-- [ ] T006 [P] Create base Pydantic models in src/ctrlf/app/models.py (SourceRef, Candidate, FieldResult, ExtractionResult, Resolution, PersistedRecord)
-- [ ] T007 Create error handling utilities in src/ctrlf/app/errors.py for graceful degradation
-- [ ] T008 [P] Create TinyDB storage adapter skeleton in src/ctrlf/app/storage.py
-- [ ] T009 [P] Create schema I/O module skeleton in src/ctrlf/app/schema_io.py
+- [x] T005 [P] Create structlog configuration in src/ctrlf/app/logging_conf.py
+- [x] T006 [P] Create base Pydantic models in src/ctrlf/app/models.py (SourceRef, Candidate, FieldResult, ExtractionResult, Resolution, PersistedRecord)
+- [x] T007 Create error handling utilities in src/ctrlf/app/errors.py for graceful degradation
+- [x] T008 [P] Create TinyDB storage adapter skeleton in src/ctrlf/app/storage.py
+- [x] T009 [P] Create schema I/O module skeleton in src/ctrlf/app/schema_io.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
