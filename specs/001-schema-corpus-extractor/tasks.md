@@ -110,23 +110,23 @@ description: "Task list template for feature implementation"
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T041 [P] [US2] Unit test for JSON Schema validation in tests/unit/test_schema_io.py
-- [ ] T042 [P] [US2] Unit test for JSON Schema to Pydantic conversion in tests/unit/test_schema_io.py
-- [ ] T043 [P] [US2] Unit test for Pydantic model import in tests/unit/test_schema_io.py
-- [ ] T044 [P] [US2] Unit test for schema extension (array coercion) in tests/unit/test_schema_io.py
-- [ ] T045 [P] [US2] Unit test for nested schema rejection in tests/unit/test_schema_io.py
+- [x] T041 [P] [US2] Unit test for JSON Schema validation in tests/unit/test_schema_io.py
+- [x] T042 [P] [US2] Unit test for JSON Schema to Pydantic conversion in tests/unit/test_schema_io.py
+- [x] T043 [P] [US2] Unit test for Pydantic model import in tests/unit/test_schema_io.py
+- [x] T044 [P] [US2] Unit test for schema extension (array coercion) in tests/unit/test_schema_io.py
+- [x] T045 [P] [US2] Unit test for nested schema rejection in tests/unit/test_schema_io.py
 - [ ] T046 [US2] Integration test for Pydantic model workflow in tests/integration/test_end_to_end.py
 
 ### Implementation for User Story 2
 
 - [x] T047 [US2] Implement validate_json_schema function in src/ctrlf/app/schema_io.py (depends on T009)
-- [ ] T048 [US2] Implement convert_json_schema_to_pydantic function in src/ctrlf/app/schema_io.py (depends on T047)
+- [x] T048 [US2] Implement convert_json_schema_to_pydantic function in src/ctrlf/app/schema_io.py (depends on T047)
 - [x] T049 [US2] Implement import_pydantic_model function in src/ctrlf/app/schema_io.py (depends on T009)
-- [ ] T050 [US2] Implement extend_schema function in src/ctrlf/app/schema_io.py (depends on T048, T049)
-- [ ] T051 [US2] Add schema format detection to upload interface in src/ctrlf/app/ui.py (depends on T035, T047, T049)
-- [ ] T052 [US2] Add "Other" text input option to review interface in src/ctrlf/app/ui.py (depends on T036)
-- [ ] T053 [US2] Add custom value validation in review interface in src/ctrlf/app/ui.py (depends on T052, T050)
-- [ ] T054 [US2] Add error messages for invalid schemas in src/ctrlf/app/ui.py (depends on T051, T007)
+- [x] T050 [US2] Implement extend_schema function in src/ctrlf/app/schema_io.py (depends on T048, T049)
+- [x] T051 [US2] Add schema format detection to upload interface in src/ctrlf/app/ui.py (depends on T035, T047, T049)
+- [x] T052 [US2] Add "Other" text input option to review interface in src/ctrlf/app/ui.py (depends on T036)
+- [x] T053 [US2] Add custom value validation in review interface in src/ctrlf/app/ui.py (depends on T052, T050)
+- [x] T054 [US2] Add error messages for invalid schemas in src/ctrlf/app/ui.py (depends on T051, T007)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 

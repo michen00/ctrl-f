@@ -27,7 +27,11 @@ from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import process_corpus
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import Candidate, PersistedRecord, Resolution, SourceRef
-from ctrlf.app.schema_io import import_pydantic_model
+from ctrlf.app.schema_io import (
+    convert_json_schema_to_pydantic,
+    import_pydantic_model,
+    validate_json_schema,
+)
 from ctrlf.app.storage import save_record
 
 if TYPE_CHECKING:
@@ -159,7 +163,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
         )
         extraction_result_state = gr.State()
 
-        def run_extraction_workflow(  # noqa: PLR0915
+        def run_extraction_workflow(  # noqa: PLR0915, PLR0912
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
@@ -192,19 +196,27 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     msg = "Schema file is required"
                     raise ValueError(msg)  # noqa: TRY301
 
-                # For v0, only Pydantic models are supported
-                # JSON Schema conversion will be implemented in User Story 2
-                if schema_type_str == "JSON Schema":
-                    msg = (
-                        "JSON Schema support not yet implemented. "
-                        "Please use a Pydantic model file (.py) instead."
-                    )
-                    raise NotImplementedError(msg)  # noqa: TRY301
-
-                # Read the Python file and import the model
-                with Path(schema_file_path).open() as f:
-                    code = f.read()
-                model_class = import_pydantic_model(code)
+                # Detect schema format and load accordingly
+                schema_path = Path(schema_file_path)
+                if schema_type_str == "JSON Schema" or schema_path.suffix == ".json":
+                    # Load JSON Schema
+                    with schema_path.open() as f:
+                        schema_json = f.read()
+                    try:
+                        schema_dict = validate_json_schema(schema_json)
+                        model_class = convert_json_schema_to_pydantic(schema_dict)
+                    except Exception as e:
+                        msg = f"Failed to load JSON Schema: {e}"
+                        raise ValueError(msg) from e
+                else:
+                    # Load Pydantic model
+                    with schema_path.open() as f:
+                        code = f.read()
+                    try:
+                        model_class = import_pydantic_model(code)
+                    except Exception as e:
+                        msg = f"Failed to load Pydantic model: {e}"
+                        raise ValueError(msg) from e
 
                 progress_messages.append("Schema loaded successfully.")
 
@@ -451,7 +463,7 @@ def create_review_interface(  # noqa: PLR0915, C901
         save_button = gr.Button("Save Record", variant="primary")
         save_status = gr.Textbox(label="Save Status", interactive=False)
 
-        def save_resolved_record(
+        def save_resolved_record(  # noqa: PLR0912, PLR0915, C901
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> str:
@@ -492,8 +504,54 @@ def create_review_interface(  # noqa: PLR0915, C901
                     field_provenance: list[SourceRef] = []
 
                     if custom_value and custom_value.strip():
-                        # Use custom value
-                        chosen_value = custom_value.strip()
+                        # Use custom value - validate it
+                        custom_value_stripped = custom_value.strip()
+
+                        # Basic validation: check if we can infer type from candidates
+                        if field_result.candidates:
+                            # Try to validate against candidate value type
+                            candidate_val: Any = field_result.candidates[0].value
+
+                            # Try to convert custom value to same type as candidates
+                            try:
+                                if isinstance(candidate_val, int):
+                                    chosen_value = int(custom_value_stripped)
+                                elif isinstance(candidate_val, float):
+                                    chosen_value = float(custom_value_stripped)
+                                elif isinstance(candidate_val, bool):
+                                    # Handle boolean strings
+                                    if custom_value_stripped.lower() in (
+                                        "true",
+                                        "1",
+                                        "yes",
+                                    ):
+                                        chosen_value = True
+                                    elif custom_value_stripped.lower() in (
+                                        "false",
+                                        "0",
+                                        "no",
+                                    ):
+                                        chosen_value = False
+                                    else:
+                                        msg = (
+                                            f"Invalid boolean value for field "
+                                            f"'{field_result.field_name}': "
+                                            f"{custom_value_stripped}"
+                                        )
+                                        raise ValueError(msg)  # noqa: TRY301
+                                else:
+                                    # String or other types - use as-is
+                                    chosen_value = custom_value_stripped
+                            except (ValueError, TypeError) as e:
+                                msg = (
+                                    f"Invalid value type for field "
+                                    f"'{field_result.field_name}': {e}"
+                                )
+                                raise ValueError(msg) from e
+                        else:
+                            # No candidates to infer type from - use as string
+                            chosen_value = custom_value_stripped
+
                         custom_input = True
                     elif candidate_value:
                         # Extract candidate index and find the candidate

@@ -12,10 +12,10 @@ __all__ = (
 import importlib.util
 import json
 import sys
-from typing import Any
+from typing import Any, Union, get_args, get_origin
 
 import jsonschema
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 
 from ctrlf.app.errors import SchemaError
 
@@ -40,7 +40,7 @@ def validate_json_schema(schema_json: str) -> dict[str, Any]:
 
     try:
         jsonschema.Draft7Validator.check_schema(schema)
-    except jsonschema.ValidationError as e:
+    except (jsonschema.ValidationError, jsonschema.exceptions.SchemaError) as e:
         msg = f"Invalid JSON Schema: {e}"
         raise SchemaError(msg) from e
 
@@ -74,10 +74,54 @@ def convert_json_schema_to_pydantic(schema: dict[str, Any]) -> type[BaseModel]:
                 )
                 raise SchemaError(msg)
 
-    # TODO: Implement full JSON Schema to Pydantic conversion  # noqa: FIX002
-    # For now, return a placeholder that will be implemented in User Story 2
-    msg = "JSON Schema to Pydantic conversion not yet implemented"
-    raise NotImplementedError(msg)
+    # Map JSON Schema types to Python/Pydantic types
+    type_mapping: dict[str, Any] = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": list,
+    }
+
+    # Build field definitions for create_model
+    field_definitions: dict[str, tuple[Any, Any]] = {}
+    required_fields = set(schema.get("required", []))
+
+    for prop_name, prop_schema in properties.items():
+        prop_type = prop_schema.get("type")
+        default_value = prop_schema.get("default", ...)
+
+        # Handle arrays
+        if prop_type == "array":
+            items_schema = prop_schema.get("items", {})
+            item_type = items_schema.get("type", "string")
+            if item_type not in type_mapping:
+                msg = (
+                    f"Unsupported array item type: {item_type} for field '{prop_name}'"
+                )
+                raise SchemaError(msg)
+            python_type: Any = list[type_mapping[item_type]]  # type: ignore[valid-type]
+        elif prop_type in type_mapping:
+            python_type = type_mapping[prop_type]
+        else:
+            msg = f"Unsupported type: {prop_type} for field '{prop_name}'"
+            raise SchemaError(msg)
+
+        # Set default if provided, or make optional if not required
+        if default_value is not ...:
+            # Has explicit default value
+            field_definitions[prop_name] = (python_type, default_value)
+        elif prop_name not in required_fields:
+            # Not required and no default - make optional
+            optional_type: Any = python_type | None
+            field_definitions[prop_name] = (optional_type, None)
+        else:
+            # Required field
+            field_definitions[prop_name] = (python_type, ...)
+
+    # Create the model class dynamically
+    model_name = schema.get("title", "GeneratedModel") or "GeneratedModel"
+    return create_model(model_name, **field_definitions)  # type: ignore[no-any-return, call-overload]
 
 
 def import_pydantic_model(code: str) -> type[BaseModel]:
@@ -151,7 +195,7 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
     return model_class
 
 
-def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
+def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:  # noqa: PLR0912
     """Create Extended Schema by coercing all fields to arrays.
 
     Args:
@@ -163,7 +207,63 @@ def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
     Raises:
         SchemaError: If model contains nested objects/arrays
     """
-    # TODO: Implement schema extension  # noqa: FIX002
-    # This will be fully implemented in User Story 2
-    msg = "Schema extension not yet implemented"
-    raise NotImplementedError(msg)
+    field_definitions: dict[str, tuple[Any, Any]] = {}
+    model_fields = model_cls.model_fields
+
+    for field_name, field_info in model_fields.items():
+        original_type = field_info.annotation
+
+        # Check for nested structures (v0 limitation)
+        # Check if type is a BaseModel subclass (nested object)
+        if isinstance(original_type, type) and issubclass(original_type, BaseModel):
+            msg = f"Nested objects not supported in v0: field '{field_name}'"
+            raise SchemaError(msg)
+
+        # Check if type is a List of BaseModel (nested array of objects)
+        origin = get_origin(original_type)
+        if origin is list:
+            args = get_args(original_type)
+            if args:
+                item_type = args[0]
+                if isinstance(item_type, type) and issubclass(item_type, BaseModel):
+                    msg = (
+                        f"Nested arrays of objects not supported in v0: "
+                        f"field '{field_name}'"
+                    )
+                    raise SchemaError(msg)
+
+        # Convert type to List[type]
+        # If already a list, keep it as is
+        origin = get_origin(original_type)
+        extended_type: Any
+        if origin is list:
+            # Already a list, keep it
+            extended_type = original_type
+        # Convert to List[type]
+        # Handle Optional types
+        elif origin is Union or origin is type(None):
+            args = get_args(original_type)
+            # Filter out None
+            non_none_args = [arg for arg in args if arg is not type(None)]
+            if non_none_args:
+                # Take the first non-None type
+                base_type = non_none_args[0]
+                extended_type = list[base_type] | None  # type: ignore[valid-type]
+            else:
+                extended_type = list[str] | None
+        else:
+            extended_type = list[original_type]  # type: ignore[valid-type]
+
+        # Preserve default value if present
+        default_value = field_info.default if field_info.default is not ... else ...
+        if default_value is ...:
+            field_definitions[field_name] = (extended_type, ...)
+        # Default should be None for Optional types, or [] for list types
+        elif origin is Union or origin is type(None):
+            field_definitions[field_name] = (extended_type, None)
+        else:
+            field_definitions[field_name] = (extended_type, [])
+
+    # Create extended model
+    extended_model_name = f"Extended{model_cls.__name__}"
+    return create_model(extended_model_name, **field_definitions)  # type: ignore[no-any-return, call-overload]
