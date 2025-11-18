@@ -73,7 +73,7 @@ class Person(BaseModel):
 
 Organize your documents in a directory:
 
-```
+```text
 corpus/
 ├── document1.pdf
 ├── document2.docx
@@ -101,22 +101,26 @@ Or create a zip/tar archive of documents.
 ### 4. Review and Resolve
 
 1. **Review Candidates**: For each field, you'll see:
+
    - List of candidate values with confidence scores
    - Consensus candidate (if detected) - pre-selected
    - "View source" button next to each candidate
    - "Other" option for custom input
 
 2. **View Source Context**: Click "View source" to see:
+
    - Document filename and location (page/line or char range)
    - Context snippet with highlighted span
    - Document metadata (mtime, checksum, etc.)
 
 3. **Select Values**:
+
    - Choose a candidate from the list, or
    - Select "Other" and enter a custom value
    - Custom values are validated against field type
 
 4. **Filter and Search**: Use top bar to:
+
    - Filter by unresolved/flagged fields
    - Search for specific field names
 
