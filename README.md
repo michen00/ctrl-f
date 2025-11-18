@@ -34,8 +34,30 @@
 
 - Python 3.12+
 - `uv` (recommended) or `pip`
+- `make` (for using Makefile shortcuts)
 
-### Install with uv
+### Install with Makefile (Recommended)
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd ctrlf
+
+# Install the project
+make install
+
+# Or install for development (includes dev dependencies and git hooks)
+make develop
+```
+
+The Makefile will automatically:
+
+- Check for and install `uv` if needed
+- Install Python version from `.python-version`
+- Install all dependencies
+- Set up git hooks (if using `make develop`)
+
+### Install with uv directly
 
 ```bash
 # Clone the repository
@@ -57,13 +79,19 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Start the Application
+### 1. Install and Start the Application
 
 ```bash
+# Install the project (if not already done)
+make install
+
+# Start the application
 python -m ctrlf.app.server
 ```
 
 The application will start on `http://localhost:7860`.
+
+**Note**: If you're developing, use `make develop` instead of `make install` to get development dependencies and git hooks.
 
 ### 2. Define Your Schema
 
@@ -222,31 +250,58 @@ Check the error summary at the end of extraction for details.
 
 ## Development
 
+### Setup
+
+```bash
+# Install for development (includes dev dependencies and git hooks)
+make develop
+
+# Or install without git hooks
+make develop WITH_HOOKS=false
+```
+
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest
+# Run all tests with coverage
+make test
+# or
+make check
 
-# Run with coverage
-pytest --cov=ctrlf --cov-report=term-missing
+# Run tests in parallel (faster)
+make test PARALLEL=true
 
-# Run specific test file
-pytest tests/unit/test_schema_io.py
+# Run specific test file (using pytest directly)
+uv run pytest tests/unit/test_schema_io.py
 ```
 
 ### Code Quality
 
 ```bash
-# Format and lint
+# Format and lint (runs all code quality checks)
 make format-all
 
-# Type checking
-mypy src/
+# Format code only
+make format
 
-# Linting
-ruff check src/
-pylint src/
+# Lint code only (with auto-fix)
+make lint
+
+# Run pre-commit checks manually
+make run-pre-commit
+```
+
+### Other Development Commands
+
+```bash
+# Clean build artifacts and caches
+make clean
+
+# Reinstall for development
+make reinstall-dev
+
+# View all available Makefile targets
+make help
 ```
 
 ### Project Structure
