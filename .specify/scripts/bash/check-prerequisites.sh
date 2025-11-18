@@ -76,44 +76,61 @@ done
 
 # Source common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=.specify/scripts/bash/common.sh
 source "$SCRIPT_DIR/common.sh"
 
 # Get feature paths and validate branch
-eval $(get_feature_paths)
+# Variables are set by eval from get_feature_paths output
+eval "$(get_feature_paths)"
+# shellcheck disable=SC2153
 check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
 
 # If paths-only mode, output paths and exit (support JSON + paths-only combined)
 if $PATHS_ONLY; then
   if $JSON_MODE; then
     # Minimal JSON paths payload (no validation performed)
+    # shellcheck disable=SC2153
+    # Variables are set by eval from get_feature_paths output
     printf '{"REPO_ROOT":"%s","BRANCH":"%s","FEATURE_DIR":"%s","FEATURE_SPEC":"%s","IMPL_PLAN":"%s","TASKS":"%s"}\n' \
       "$REPO_ROOT" "$CURRENT_BRANCH" "$FEATURE_DIR" "$FEATURE_SPEC" "$IMPL_PLAN" "$TASKS"
   else
+    # shellcheck disable=SC2153
     echo "REPO_ROOT: $REPO_ROOT"
+    # shellcheck disable=SC2153
     echo "BRANCH: $CURRENT_BRANCH"
+    # shellcheck disable=SC2153
     echo "FEATURE_DIR: $FEATURE_DIR"
+    # shellcheck disable=SC2153
     echo "FEATURE_SPEC: $FEATURE_SPEC"
+    # shellcheck disable=SC2153
     echo "IMPL_PLAN: $IMPL_PLAN"
+    # shellcheck disable=SC2153
     echo "TASKS: $TASKS"
   fi
   exit 0
 fi
 
 # Validate required directories and files
+# shellcheck disable=SC2153
 if [[ ! -d $FEATURE_DIR ]]; then
+  # shellcheck disable=SC2153
   echo "ERROR: Feature directory not found: $FEATURE_DIR" >&2
   echo "Run /speckit.specify first to create the feature structure." >&2
   exit 1
 fi
 
+# shellcheck disable=SC2153
 if [[ ! -f $IMPL_PLAN ]]; then
+  # shellcheck disable=SC2153
   echo "ERROR: plan.md not found in $FEATURE_DIR" >&2
   echo "Run /speckit.plan first to create the implementation plan." >&2
   exit 1
 fi
 
 # Check for tasks.md if required
+# shellcheck disable=SC2153
 if $REQUIRE_TASKS && [[ ! -f $TASKS ]]; then
+  # shellcheck disable=SC2153
   echo "ERROR: tasks.md not found in $FEATURE_DIR" >&2
   echo "Run /speckit.tasks first to create the task list." >&2
   exit 1
@@ -148,9 +165,11 @@ if $JSON_MODE; then
     json_docs="[${json_docs%,}]"
   fi
 
+  # shellcheck disable=SC2153
   printf '{"FEATURE_DIR":"%s","AVAILABLE_DOCS":%s}\n' "$FEATURE_DIR" "$json_docs"
 else
   # Text output
+  # shellcheck disable=SC2153
   echo "FEATURE_DIR:$FEATURE_DIR"
   echo "AVAILABLE_DOCS:"
 
