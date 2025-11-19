@@ -171,7 +171,7 @@ description: "Task list template for feature implementation"
 - [x] T069 [P] Add JSON export functionality for saved records in src/ctrlf/app/ui.py (depends on T034)
 - [x] T070 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
 - [ ] T071 [P] Update README.md with installation and usage instructions
-- [ ] T072 [P] Add docstrings to all public functions and classes
+- [x] T072 [P] Add docstrings to all public functions and classes
 - [ ] T073 Code cleanup and refactoring
 - [ ] T074 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
 - [ ] T075 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
