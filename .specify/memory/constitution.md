@@ -1,7 +1,7 @@
 <!--
 Sync Impact Report:
-- Version change: 1.0.0 → 1.0.1 (PATCH: clarification of Principle II)
-- Modified principles: II. Type Safety & Static Analysis (updated to reference make format-all)
+- Version change: 1.0.1 → 1.0.2 (PATCH: expanded Documentation section to require README updates)
+- Modified principles: N/A
 - Added sections: N/A
 - Removed sections: N/A
 - Templates requiring updates:
@@ -51,9 +51,8 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 ### Code Quality
 
 - All code MUST pass `make format-all` before commit (runs ruff, pylint, mypy via pre-commit/prek)
-- Code MUST follow PEP 8 style guidelines (enforced by ruff)
-- Maximum line length: 100 characters (configurable exceptions for URLs, long strings)
-- All public APIs MUST have docstrings following Google or NumPy style
+- Maximum line length: 88 characters (configurable exceptions for URLs, long strings)
+- All public APIs MUST have docstrings following Google style
 - Private functions and classes MUST have inline comments explaining non-obvious logic
 
 ### Testing Requirements
@@ -66,9 +65,14 @@ All operations MUST use structured logging via structlog. Logs MUST include cont
 
 ### Documentation
 
-- README.md MUST include installation, basic usage, and examples
-- All public functions, classes, and modules MUST have docstrings
-- Complex algorithms or business logic MUST have inline comments
+- README.md MUST be kept current and accurately reflect the codebase's current capabilities, features, and usage patterns
+- README.md MUST include installation instructions (preferring Makefile shortcuts when available), basic usage, and examples
+- README.md MUST be updated when:
+  - New features or capabilities are added
+  - Installation or setup procedures change
+  - API or interface changes affect usage
+- All public functions, classes, and modules MUST have docstrings following Google style
+- Complex algorithms or business logic MUST have inline comments explaining non-obvious logic
 - Breaking changes MUST be documented in CHANGELOG.md
 
 ## Governance
@@ -86,4 +90,4 @@ This constitution supersedes all other development practices and guidelines. All
 
 Complexity additions MUST be justified. When a principle violation is necessary, it MUST be documented in the implementation plan with rationale and simpler alternatives considered.
 
-**Version**: 1.0.1 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-18
+**Version**: 1.0.2 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-18
