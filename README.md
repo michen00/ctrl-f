@@ -11,13 +11,20 @@
 ### Core Capabilities
 
 - **Schema-Driven Extraction**: Accept JSON Schema or Pydantic model definitions to specify the structure of data to extract
-- **Multi-Format Document Support**: Process PDF, DOCX, HTML, and TXT files from directories or archives (ZIP, TAR)
+- **Multi-Format Document Support**: Process PDF, DOCX, HTML, and TXT files from directories or archives (ZIP, TAR, TAR.GZ)
 - **AI-Powered Field Extraction**: Uses `langextract` to extract candidate values for each schema field with confidence scores
 - **Intelligent Deduplication**: Groups near-duplicate candidates using fuzzy string matching (`thefuzz`)
 - **Consensus Detection**: Automatically identifies high-confidence values when one candidate significantly outperforms others
+- **Disagreement Detection**: Flags fields where multiple candidates have similar confidence scores, requiring manual review
 - **Full Provenance Tracking**: Every extracted value includes source document, location (page/line or char-range), and context snippet
 - **Zero Fabrication Guarantee**: All candidates must be grounded in actual document content with verifiable source locations
-- **Interactive Review Interface**: Gradio web UI for reviewing candidates, viewing source context, and resolving conflicts
+- **Interactive Review Interface**: Gradio web UI with:
+  - Field filtering and search capabilities
+  - Visual indicators for disagreements and consensus
+  - Individual source viewing for each candidate
+  - Side-by-side source comparison
+  - Progress tracking with cancellation support
+- **Export Capabilities**: Export validated records as JSON files with full provenance
 - **Persistent Storage**: Saves validated records to TinyDB with complete audit trails
 
 ### Technical Highlights
@@ -152,32 +159,64 @@ Or create a ZIP/TAR archive of documents.
 ### 4. Run Extraction
 
 1. Open `http://localhost:7860` in your browser
-2. Upload your schema file (JSON or Python)
-3. Upload your corpus (directory path or archive file)
-4. Configure options (optional):
-   - Null policy: Empty list vs explicit null
-   - Confidence threshold: Consensus detection threshold (default: 0.75)
-5. Click **"Run Extraction"**
-6. Wait for processing to complete
+2. **Upload Schema**: Upload your schema file (JSON or Python)
+3. **Select Schema Type**: Choose "JSON Schema" or "Pydantic Model" (auto-detected from file extension)
+4. **Upload Corpus**: Either:
+   - Upload a ZIP/TAR archive file, or
+   - Enter a directory path containing your documents
+5. **Configure Options** (optional):
+   - **Null policy**: How to handle empty fields
+     - "Empty List" (default): `[]` for fields with no candidates
+     - "Explicit Null": `[null]` for fields with no candidates
+   - **Confidence threshold**: Consensus detection threshold (default: 0.75)
+     - Higher values require more confidence for automatic consensus
+6. Click **"Run Extraction"**
+7. **Monitor Progress**:
+   - Progress bar shows current stage (schema loading, corpus processing, extraction)
+   - Progress messages display detailed status
+   - You can cancel the operation at any time using the cancel button
 
 ### 5. Review and Resolve
 
-1. **Review Candidates**: For each field, see:
+The review interface provides comprehensive tools for reviewing and resolving extracted candidates:
 
-   - List of candidate values with confidence scores
-   - Consensus candidate (if detected) - pre-selected
-   - "View source" button to see document context
-   - "Other" option for custom input
+1. **Filter and Search Fields**:
 
-2. **View Source Context**: Click "View source" to see:
+   - Use the search box to filter fields by name
+   - Filter by type:
+     - **All**: Show all fields
+     - **Unresolved**: Show only fields without consensus
+     - **Flagged (Disagreements)**: Show only fields with conflicting candidates
 
-   - Document filename and location (page/line or char-range)
-   - Context snippet with highlighted span
-   - Document metadata
+2. **Review Candidates**: For each field, you'll see:
 
-3. **Select Values**: Choose a candidate or enter a custom value
+   - **Consensus Status**:
+     - ✅ Consensus detected (with confidence percentage) - value is pre-selected
+     - 🔴 Disagreement detected - multiple candidates with similar confidence, manual selection required
+     - ⚠️ No consensus - manual selection required
+   - **Candidate List**: All candidate values with confidence scores displayed as percentages
+   - **Individual "View Source" Buttons**: One button per candidate to view its source context
+   - **"View Source for Selected Candidate" Button**: View source for the currently selected candidate
+   - **"Other" Text Input**: Option to enter a custom value (validated against field type)
 
-4. **Save**: Click "Save Record" to validate and persist to TinyDB
+3. **View Source Context**: Click any "View source" button to see:
+
+   - Document filename and path
+   - Location information (page number or character range)
+   - Context snippet showing the surrounding text
+   - Side-by-side comparison when multiple sources exist for a candidate
+
+4. **Select Values**:
+
+   - Choose a candidate from the radio button list, or
+   - Enter a custom value in the "Other" field (automatically validated)
+   - Custom values are type-checked against the schema field type
+
+5. **Save or Export**:
+   - **Save Record**: Click "Save Record" to validate and persist to TinyDB
+     - Shows success message with record ID
+   - **Export as JSON**: Click "Export as JSON" to download the record as a JSON file
+     - Includes resolved values, provenance, and audit trail
 
 ## Architecture
 
@@ -223,13 +262,19 @@ Records are saved to TinyDB in:
 - Default: `~/.ctrlf/db/`
 - One table per schema (keyed by schema hash)
 - Records keyed by `record_id`
+- Each record includes:
+  - `resolved`: Final field values (as arrays per Extended Schema)
+  - `provenance`: Source references for each field
+  - `audit`: Run ID, timestamp, app version, configuration
 
 ### Consensus Thresholds
 
 - **Confidence threshold**: 0.75 (minimum confidence for consensus)
+  - Adjustable in UI (0.0 to 1.0, step 0.05)
+  - Higher values require more confidence for automatic consensus
 - **Margin threshold**: 0.20 (minimum margin over next candidate)
-
-These can be adjusted in the UI before running extraction.
+  - Fixed threshold for consensus detection
+  - Ensures consensus candidate is significantly better than alternatives
 
 ### Null Policy
 
@@ -238,6 +283,8 @@ Controls how empty fields are handled:
 - **Empty list** (default): `[]` for fields with no candidates
 - **Explicit null**: `[null]` for fields with no candidates
 
+**Note**: In v0, the null policy setting is accepted but not yet fully implemented in the extraction logic. All fields are currently stored as arrays per the Extended Schema pattern.
+
 ## Error Handling
 
 The system handles errors gracefully:
@@ -245,8 +292,13 @@ The system handles errors gracefully:
 - **Document conversion failures**: Continues processing other documents, shows warning, includes in error summary
 - **Extraction errors**: Logs and continues, produces partial results
 - **Validation errors**: Shows field-level messages, keeps user on review screen
+- **Cancellation**: Operations can be cancelled at any time; partial results are preserved
 
-Check the error summary at the end of extraction for details.
+**Error Summary**: After extraction completes, check the error output section (if visible) for a comprehensive summary of any issues encountered during processing. The summary includes:
+
+- Document-level errors (conversion failures, unsupported formats)
+- Field-level errors (extraction failures, validation issues)
+- Error counts and affected documents/fields
 
 ## Development
 
@@ -321,11 +373,13 @@ ctrlf/
 
 ## Limitations (v0)
 
-- **Flat schemas only**: No nested objects/arrays
-- **Single-user application**: No authentication
-- **Local processing only**: No cloud/network features
-- **Basic normalization**: Emails, dates, URLs (can be extended)
-- **Batch processing**: No incremental streaming
+- **Flat schemas only**: No nested objects/arrays (only primitive types or arrays of primitives)
+- **Single-user application**: No authentication or multi-user support
+- **Local processing only**: No cloud/network features, all processing happens locally
+- **Basic normalization**: Limited normalization for emails, dates, URLs (can be extended)
+- **Batch processing**: No incremental streaming, processes entire corpus at once
+- **Null policy**: Setting is accepted but not yet fully implemented in extraction logic
+- **Progress tracking**: High-level progress for extraction phase (detailed per-field progress not yet implemented)
 
 ## Dependencies
 
