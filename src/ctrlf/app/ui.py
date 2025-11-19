@@ -126,7 +126,7 @@ def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False)
     )
 
 
-def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
+def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
     """Create Gradio interface for schema and corpus upload.
 
     Returns:
@@ -191,14 +191,22 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
         )
         extraction_result_state = gr.State()
 
-        def run_extraction_workflow(  # noqa: PLR0915
+        def _raise_cancellation() -> None:
+            """Raise KeyboardInterrupt for cancellation handling.
+
+            This is a helper function to satisfy linter rules about abstracting raises.
+            """
+            msg = "Operation cancelled by user"
+            raise KeyboardInterrupt(msg)
+
+        def run_extraction_workflow(  # noqa: C901 PLR0912 PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
-            _progress: gr.Progress,
+            progress: gr.Progress,
         ) -> ExtractionWorkflowResult:
             """Run the extraction workflow.
 
@@ -209,7 +217,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 corpus_dir_path: Path to corpus directory
                 _null_policy_str: Null policy setting (unused in v0)
                 _confidence: Confidence threshold (unused in v0)
-                _progress: Gradio progress tracker (unused)
+                progress: Gradio progress tracker for progress bars and cancellation
 
             Returns:
                 ExtractionWorkflowResult with progress, error, result, and visibility
@@ -218,8 +226,20 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             progress_messages: list[str] = []
 
             try:
-                # Step 1: Load schema
+                # Step 1: Load schema (0-20%)
+                progress(0, desc="Loading schema...")
                 progress_messages.append("Loading schema...")
+
+                # Check for cancellation
+                if progress.cancelled:  # type: ignore[attr-defined]
+                    progress_messages.append("Operation cancelled by user.")
+                    return ExtractionWorkflowResult(
+                        progress_message="\n".join(progress_messages),
+                        error_message="Operation cancelled by user.",
+                        extraction_result=None,
+                        error_visibility=gr.update(visible=True),
+                    )
+
                 if not schema_file_path:
                     msg = "Schema file is required"
                     raise ValueError(msg)  # noqa: TRY301
@@ -246,10 +266,24 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                         msg = f"Failed to load Pydantic model: {e}"
                         raise ValueError(msg) from e
 
+                progress(0.2, desc="Schema loaded successfully.")
                 progress_messages.append("Schema loaded successfully.")
 
-                # Step 2: Process corpus
+                # Check for cancellation
+                if progress.cancelled:  # type: ignore[attr-defined]
+                    progress_messages.append("Operation cancelled by user.")
+                    return ExtractionWorkflowResult(
+                        progress_message="\n".join(progress_messages),
+                        error_message="Operation cancelled by user.",
+                        extraction_result=None,
+                        error_visibility=gr.update(visible=True),
+                    )
+
+                # Step 2: Process corpus (20-60%)
+                progress(0.2, desc="Processing corpus...")
                 progress_messages.append("Processing corpus...")
+
+                corpus_docs: list[Any] = []
 
                 if corpus_file_path:
                     # Extract archive to temp directory
@@ -257,6 +291,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     # So we'll extract first, then process
                     tmpdir = tempfile.mkdtemp()
                     try:
+                        progress(0.25, desc="Extracting archive...")
                         if corpus_file_path.endswith(".zip"):
                             with zipfile.ZipFile(corpus_file_path, "r") as zip_ref:
                                 zip_ref.extractall(tmpdir)  # noqa: S202
@@ -270,12 +305,48 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                             msg = f"Unsupported archive format: {corpus_file_path}"
                             raise ValueError(msg)
 
+                        # Check for cancellation after extraction
+                        if progress.cancelled:  # type: ignore[attr-defined]
+                            progress_messages.append("Operation cancelled by user.")
+                            return ExtractionWorkflowResult(
+                                progress_message="\n".join(progress_messages),
+                                error_message="Operation cancelled by user.",
+                                extraction_result=None,
+                                error_visibility=gr.update(visible=True),
+                            )
+
+                        # Count files to process for progress tracking
+                        path = Path(tmpdir)
+                        files_to_count: list[Path] = []
+                        for ext in [
+                            "*.pdf",
+                            "*.docx",
+                            "*.html",
+                            "*.htm",
+                            "*.txt",
+                            "*.md",
+                        ]:
+                            files_to_count.extend(path.rglob(ext))
+
+                        def corpus_progress_callback(count: int, total: int) -> None:
+                            """Update progress during corpus processing."""
+                            # Map to 20-60% range: 20% + (count/total) * 40%
+                            progress_pct = 0.2 + (count / total) * 0.4
+                            progress(
+                                progress_pct,
+                                desc=f"Processing corpus: {count}/{total} documents",
+                            )
+                            progress_messages.append(
+                                f"Processed {count}/{total} documents"
+                            )
+
+                            # Check for cancellation
+                            if progress.cancelled:  # type: ignore[attr-defined]
+                                _raise_cancellation()
+
                         corpus_docs = process_corpus(
                             tmpdir,
-                            progress_callback=lambda count,
-                            total: progress_messages.append(
-                                f"Processed {count}/{total} documents"
-                            ),
+                            progress_callback=corpus_progress_callback,
                         )
                     finally:
                         # Clean up temp directory after processing
@@ -284,23 +355,71 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     if not Path(corpus_dir_path).exists():
                         msg = f"Corpus directory does not exist: {corpus_dir_path}"
                         raise ValueError(msg)  # noqa: TRY301
+
+                    # Count files to process for progress tracking
+                    corpus_path = Path(corpus_dir_path)
+                    corpus_files: list[Path] = []
+                    for ext in ["*.pdf", "*.docx", "*.html", "*.htm", "*.txt", "*.md"]:
+                        corpus_files.extend(corpus_path.rglob(ext))
+
+                    def corpus_progress_callback(count: int, total: int) -> None:
+                        """Update progress during corpus processing."""
+                        # Map to 20-60% range: 20% + (count/total) * 40%
+                        progress_pct = 0.2 + (count / total) * 0.4
+                        progress(
+                            progress_pct,
+                            desc=f"Processing corpus: {count}/{total} documents",
+                        )
+                        progress_messages.append(f"Processed {count}/{total} documents")
+
+                        # Check for cancellation
+                        if progress.cancelled:  # type: ignore[attr-defined]
+                            _raise_cancellation()
+
                     corpus_docs = process_corpus(
                         corpus_dir_path,
-                        progress_callback=lambda count, total: progress_messages.append(
-                            f"Processed {count}/{total} documents"
-                        ),
+                        progress_callback=corpus_progress_callback,
                     )
                 else:
                     msg = "Corpus file or directory is required"
                     raise ValueError(msg)  # noqa: TRY301
 
+                progress(0.6, desc=f"Processed {len(corpus_docs)} documents.")
                 progress_messages.append(f"Processed {len(corpus_docs)} documents.")
 
-                # Step 3: Run extraction
+                # Check for cancellation
+                if progress.cancelled:  # type: ignore[attr-defined]
+                    progress_messages.append("Operation cancelled by user.")
+                    return ExtractionWorkflowResult(
+                        progress_message="\n".join(progress_messages),
+                        error_message="Operation cancelled by user.",
+                        extraction_result=None,
+                        error_visibility=gr.update(visible=True),
+                    )
+
+                # Step 3: Run extraction (60-100%)
+                progress(0.6, desc="Running extraction...")
                 progress_messages.append("Running extraction...")
+
+                # Check for cancellation before starting extraction
+                if progress.cancelled:  # type: ignore[attr-defined]
+                    progress_messages.append("Operation cancelled by user.")
+                    return ExtractionWorkflowResult(
+                        progress_message="\n".join(progress_messages),
+                        error_message="Operation cancelled by user.",
+                        extraction_result=None,
+                        error_visibility=gr.update(visible=True),
+                    )
+
+                # Run extraction
+                # Note: Detailed progress tracking within extraction would require
+                # modifying run_extraction to accept a progress callback
                 extraction_result = run_extraction(model_class, corpus_docs)
+
+                progress(0.95, desc="Extraction complete. Finalizing...")
                 progress_messages.append("Extraction complete.")
 
+                progress(1.0, desc="Complete!")
                 progress_msg = "\n".join(progress_messages)
                 return ExtractionWorkflowResult(
                     progress_message=progress_msg,
@@ -309,6 +428,15 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     error_visibility=gr.update(visible=False),
                 )
 
+            except KeyboardInterrupt:
+                # Handle cancellation
+                progress_messages.append("Operation cancelled by user.")
+                return ExtractionWorkflowResult(
+                    progress_message="\n".join(progress_messages),
+                    error_message="Operation cancelled by user.",
+                    extraction_result=None,
+                    error_visibility=gr.update(visible=True),
+                )
             except Exception as e:
                 collect_errors(
                     error_summary,
