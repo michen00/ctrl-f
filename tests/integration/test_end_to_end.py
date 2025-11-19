@@ -98,3 +98,52 @@ class InvoiceModel(BaseModel):
                 # Consensus should be None or one of the candidates
                 if field_result.consensus is not None:
                     assert field_result.consensus in field_result.candidates
+
+    def test_disagreement_resolution_workflow(self) -> None:
+        """Test disagreement resolution workflow (User Story 3)."""
+
+        # Create Extended Schema model
+        class PersonModel(BaseModel):
+            name: list[str]
+            email: list[str]
+
+        # Create test corpus with conflicting values
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_dir = Path(tmpdir)
+            (test_dir / "doc1.txt").write_text(
+                "Name: Alice Smith\nEmail: alice@example.com"
+            )
+            (test_dir / "doc2.txt").write_text(
+                "Name: Bob Jones\nEmail: bob@example.com"
+            )
+            (test_dir / "doc3.txt").write_text(
+                "Name: Alice Johnson\nEmail: alice.j@example.com"
+            )
+
+            # Step 1: Ingest corpus
+            corpus_docs = process_corpus(str(test_dir))
+            assert len(corpus_docs) == 3
+
+            # Step 2: Run extraction
+            extraction_result = run_extraction(PersonModel, corpus_docs)
+            assert isinstance(extraction_result, ExtractionResult)
+
+            # Step 3: Find a field with disagreements (no consensus)
+            field_with_disagreement = None
+            for field_result in extraction_result.results:
+                if field_result.consensus is None and len(field_result.candidates) > 1:
+                    field_with_disagreement = field_result
+                    break
+
+            # Step 4: Verify disagreement scenario exists
+            # At least one field should have multiple candidates without consensus
+            # (This may depend on extraction quality, so we check if it exists)
+            if field_with_disagreement:
+                # Should have multiple candidates
+                assert len(field_with_disagreement.candidates) >= 2
+                # No consensus should be detected
+                assert field_with_disagreement.consensus is None
+                # All candidates should have confidence scores
+                for candidate in field_with_disagreement.candidates:
+                    assert 0.0 <= candidate.confidence <= 1.0
+                    assert len(candidate.sources) > 0

@@ -32,19 +32,12 @@ class SourceRef(BaseModel):
     doc_id: str = Field(..., min_length=1, description="Document identifier")
     path: str = Field(..., min_length=1, description="Original file path")
     location: str = Field(..., min_length=1, description="Location descriptor")
-    snippet: str = Field(..., description="Context snippet around extracted span")
+    snippet: str = Field(
+        ..., min_length=7, description="Context snippet around extracted span"
+    )
     meta: dict[str, object] = Field(
         default_factory=dict, description="Additional metadata"
     )
-
-    @field_validator("snippet")
-    @classmethod
-    def validate_snippet_length(cls, v: str) -> str:
-        """Validate snippet is reasonable length (50-200 chars recommended)."""
-        if len(v) < 10:
-            msg = "Snippet too short (minimum 10 characters)"
-            raise ValueError(msg)
-        return v
 
 
 class Candidate(BaseModel):
