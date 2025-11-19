@@ -167,15 +167,14 @@ description: "Task list template for feature implementation"
 - [x] T065 [P] Add progress indicators with cancellation support in src/ctrlf/app/ui.py
 - [x] T066 [P] Add error summary display at end of processing in src/ctrlf/app/ui.py
 - [x] T067 [P] Add null policy configuration option in src/ctrlf/app/ui.py
-- [ ] T068 [P] Add PII redaction option for UI previews in src/ctrlf/app/ui.py
-- [x] T069 [P] Add JSON export functionality for saved records in src/ctrlf/app/ui.py (depends on T034)
-- [x] T070 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
-- [ ] T071 [P] Update README.md with installation and usage instructions
-- [x] T072 [P] Add docstrings to all public functions and classes
-- [ ] T073 Code cleanup and refactoring
-- [ ] T074 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
-- [x] T075 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
-- [ ] T076 Run quickstart.md validation
+- [x] T068 [P] Add JSON export functionality for saved records in src/ctrlf/app/ui.py (depends on T034)
+- [x] T069 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
+- [ ] T070 [P] Update README.md with installation and usage instructions
+- [x] T071 [P] Add docstrings to all public functions and classes
+- [ ] T072 Code cleanup and refactoring
+- [ ] T073 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
+- [x] T074 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
+- [ ] T075 Run quickstart.md validation
 
 ---
 
