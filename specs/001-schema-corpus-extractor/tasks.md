@@ -174,7 +174,7 @@ description: "Task list template for feature implementation"
 - [x] T072 [P] Add docstrings to all public functions and classes
 - [ ] T073 Code cleanup and refactoring
 - [ ] T074 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
-- [ ] T075 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
+- [x] T075 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
 - [ ] T076 Run quickstart.md validation
 
 ---

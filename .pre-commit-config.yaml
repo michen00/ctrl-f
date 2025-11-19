@@ -112,6 +112,7 @@ repos:
           ]
         additional_dependencies:
           - gradio
+          - langextract
           - nox[uv]
           - pydantic[mypy]
           - pytest

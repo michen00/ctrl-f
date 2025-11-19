@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from langextract import extract  # type: ignore[import-not-found]
+from langextract import extract
 
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import Candidate, ExtractionResult, FieldResult, SourceRef
