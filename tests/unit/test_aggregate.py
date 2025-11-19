@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from ctrlf.app.aggregate import (
     aggregate_field_results,
     deduplicate_candidates,
@@ -55,11 +57,13 @@ class TestDeduplicateCandidates:
                 value="test@example.com",
                 confidence=0.9,
                 sources=[source1],
+                normalized=None,
             ),
             Candidate(
                 value="test@example.com",  # Same value, different source
                 confidence=0.85,
                 sources=[source2],
+                normalized=None,
             ),
         ]
 
@@ -80,9 +84,15 @@ class TestDeduplicateCandidates:
         )
 
         candidates = [
-            Candidate(value="value1", confidence=0.7, sources=[source]),
-            Candidate(value="value2", confidence=0.9, sources=[source]),
-            Candidate(value="value3", confidence=0.8, sources=[source]),
+            Candidate(
+                value="value1", confidence=0.7, sources=[source], normalized=None
+            ),
+            Candidate(
+                value="value2", confidence=0.9, sources=[source], normalized=None
+            ),
+            Candidate(
+                value="value3", confidence=0.8, sources=[source], normalized=None
+            ),
         ]
 
         deduplicated = deduplicate_candidates(candidates)
@@ -105,8 +115,15 @@ class TestDetectConsensus:
         )
 
         candidates = [
-            Candidate(value="consensus_value", confidence=0.85, sources=[source]),
-            Candidate(value="other_value", confidence=0.60, sources=[source]),
+            Candidate(
+                value="consensus_value",
+                confidence=0.85,
+                sources=[source],
+                normalized=None,
+            ),
+            Candidate(
+                value="other_value", confidence=0.60, sources=[source], normalized=None
+            ),
         ]
 
         consensus = detect_consensus(
@@ -125,8 +142,12 @@ class TestDetectConsensus:
         )
 
         candidates = [
-            Candidate(value="value1", confidence=0.70, sources=[source]),  # Below 0.75
-            Candidate(value="value2", confidence=0.50, sources=[source]),
+            Candidate(
+                value="value1", confidence=0.70, sources=[source], normalized=None
+            ),  # Below 0.75
+            Candidate(
+                value="value2", confidence=0.50, sources=[source], normalized=None
+            ),
         ]
 
         consensus = detect_consensus(
@@ -144,9 +165,11 @@ class TestDetectConsensus:
         )
 
         candidates = [
-            Candidate(value="value1", confidence=0.80, sources=[source]),
             Candidate(
-                value="value2", confidence=0.75, sources=[source]
+                value="value1", confidence=0.80, sources=[source], normalized=None
+            ),
+            Candidate(
+                value="value2", confidence=0.75, sources=[source], normalized=None
             ),  # Margin < 0.20
         ]
 
@@ -169,8 +192,12 @@ class TestAggregateFieldResults:
         )
 
         candidates = [
-            Candidate(value="value1", confidence=0.9, sources=[source]),
-            Candidate(value="value2", confidence=0.8, sources=[source]),
+            Candidate(
+                value="value1", confidence=0.9, sources=[source], normalized=None
+            ),
+            Candidate(
+                value="value2", confidence=0.8, sources=[source], normalized=None
+            ),
         ]
 
         field_result = aggregate_field_results("test_field", candidates)
@@ -188,10 +215,141 @@ class TestAggregateFieldResults:
         )
 
         candidates = [
-            Candidate(value="consensus", confidence=0.85, sources=[source]),
-            Candidate(value="other", confidence=0.60, sources=[source]),
+            Candidate(
+                value="consensus", confidence=0.85, sources=[source], normalized=None
+            ),
+            Candidate(
+                value="other", confidence=0.60, sources=[source], normalized=None
+            ),
         ]
 
         field_result = aggregate_field_results("test_field", candidates)
         if field_result.consensus:
             assert field_result.consensus.value == "consensus"
+
+
+class TestDisagreementDetection:
+    """Test disagreement detection (User Story 3)."""
+
+    def test_detect_disagreement_when_no_consensus(self) -> None:
+        """Test that disagreement is detected when no consensus exists."""
+        source1 = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="line 1",
+            snippet="Name: Alice",
+        )
+        source2 = SourceRef(
+            doc_id="doc2",
+            path="doc2.txt",
+            location="line 1",
+            snippet="Name: Bob",
+        )
+
+        candidates = [
+            Candidate(
+                value="Alice", confidence=0.80, sources=[source1], normalized=None
+            ),
+            Candidate(
+                value="Bob", confidence=0.75, sources=[source2], normalized=None
+            ),  # Close confidence
+        ]
+
+        field_result = aggregate_field_results("name", candidates)
+        # No consensus should be detected (margin < 0.20)
+        assert field_result.consensus is None
+        # Should have multiple candidates indicating disagreement
+        assert len(field_result.candidates) >= 2
+
+    def test_detect_disagreement_multiple_high_confidence(self) -> None:
+        """Test disagreement detection with multiple high-confidence candidates."""
+        source1 = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="line 1",
+            snippet="Email: alice@example.com",
+        )
+        source2 = SourceRef(
+            doc_id="doc2",
+            path="doc2.txt",
+            location="line 1",
+            snippet="Email: bob@example.com",
+        )
+
+        candidates = [
+            Candidate(
+                value="alice@example.com",
+                confidence=0.85,
+                sources=[source1],
+                normalized=None,
+            ),
+            Candidate(
+                value="bob@example.com",
+                confidence=0.82,
+                sources=[source2],
+                normalized=None,
+            ),
+        ]
+
+        field_result = aggregate_field_results("email", candidates)
+        # No consensus due to small margin
+        assert field_result.consensus is None
+        # Both candidates should be present
+        assert len(field_result.candidates) == 2
+
+
+class TestConfidenceScoreComputation:
+    """Test confidence score computation (User Story 3)."""
+
+    def test_confidence_scores_preserved_after_deduplication(self) -> None:
+        """Test that confidence scores are properly computed after deduplication."""
+        source1 = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="line 1",
+            snippet="Value: test",
+        )
+        source2 = SourceRef(
+            doc_id="doc2",
+            path="doc2.txt",
+            location="line 1",
+            snippet="Value: test",
+        )
+
+        candidates = [
+            Candidate(value="test", confidence=0.9, sources=[source1], normalized=None),
+            Candidate(value="test", confidence=0.8, sources=[source2], normalized=None),
+        ]
+
+        deduplicated = deduplicate_candidates(candidates, similarity_threshold=0.85)
+        # Should merge into one candidate
+        assert len(deduplicated) == 1
+        # Confidence should be averaged (use approximate equality for floating-point)
+        merged = deduplicated[0]
+        assert merged.confidence == pytest.approx(0.85)  # (0.9 + 0.8) / 2
+
+    def test_confidence_scores_sorted_descending(self) -> None:
+        """Test that candidates are sorted by confidence in descending order."""
+        source = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="line 1",
+            snippet="Test snippet",
+        )
+
+        candidates = [
+            Candidate(value="low", confidence=0.5, sources=[source], normalized=None),
+            Candidate(value="high", confidence=0.9, sources=[source], normalized=None),
+            Candidate(
+                value="medium", confidence=0.7, sources=[source], normalized=None
+            ),
+        ]
+
+        field_result = aggregate_field_results("test_field", candidates)
+        # Should be sorted by confidence descending
+        if len(field_result.candidates) > 1:
+            for i in range(len(field_result.candidates) - 1):
+                assert (
+                    field_result.candidates[i].confidence
+                    >= field_result.candidates[i + 1].confidence
+                )

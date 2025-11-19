@@ -10,6 +10,7 @@ __all__ = (
     "show_source_context",
 )
 
+import json
 import shutil
 import tarfile
 import tempfile
@@ -23,6 +24,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import gradio as gr
 from slugify import slugify
 
+from ctrlf.app.aggregate import has_disagreement
 from ctrlf.app.errors import ErrorSummary, collect_errors
 from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import process_corpus
@@ -85,18 +87,33 @@ def _safe_snippet(snippet: str) -> str:
     return snippet.replace("```", "``` ")
 
 
-def show_source_context(sources: list[SourceRef]) -> str:
+def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False) -> str:
     """Generate formatted source context display.
 
     Args:
         sources: Source references to display
+        side_by_side: If True, format for side-by-side comparison
 
     Returns:
         Formatted Markdown string with snippets and metadata
     """
-    return (
-        "\n\n".join(
-            cleandoc(f"""
+    if not sources:
+        return "No sources available."
+
+    if side_by_side and len(sources) >= 2:
+        # Format for side-by-side comparison (using HTML table in Markdown)
+        rows = []
+        for i, source in enumerate(sources, 1):
+            rows.append(
+                f"| **Source {i}** | `{source.path}` | {source.location} |\n"
+                f"| Context | `{_safe_snippet(source.snippet)}` | |"
+            )
+        header = "| Source | Document | Location |\n|--------|----------|----------|"
+        return f"{header}\n" + "\n".join(rows)
+
+    # Standard vertical format
+    return "\n\n".join(
+        cleandoc(f"""
                 ### Source {i}
                 **Document**: `{source.path}`
                 **Location**: {source.location}
@@ -105,10 +122,7 @@ def show_source_context(sources: list[SourceRef]) -> str:
                 ```
                 {_safe_snippet(source.snippet)}
                 ```""")
-            for i, source in enumerate(sources, 1)
-        )
-        if sources
-        else "No sources available."
+        for i, source in enumerate(sources, 1)
     )
 
 
@@ -377,55 +391,150 @@ def create_review_interface(  # noqa: PLR0915, C901
             f"**Created**: {extraction_result.created_at}"
         )
 
+        # Filter/search functionality (User Story 3 + Polish)
+        with gr.Row():
+            filter_text = gr.Textbox(
+                label="Filter Fields",
+                placeholder="Search by field name...",
+                value="",
+            )
+            filter_type = gr.Radio(
+                choices=["All", "Unresolved", "Flagged (Disagreements)"],
+                value="All",
+                label="Filter Type",
+            )
+        filter_status = gr.Markdown(visible=False)
+
         field_components: dict[str, Any] = {}
+        field_accordions: dict[str, Any] = {}
+
+        # Check for disagreements
+        field_disagreements = {
+            fr.field_name: has_disagreement(fr.candidates)
+            for fr in extraction_result.results
+        }
 
         for field_result in extraction_result.results:
+            has_disag = field_disagreements.get(field_result.field_name, False)
+            # Visual flagging for disagreements (User Story 3)
+            accordion_label = f"Field: {field_result.field_name}"
+            if has_disag:
+                accordion_label = f"🔴 {accordion_label} (Disagreement)"
+
             with gr.Accordion(
-                label=f"Field: {field_result.field_name}",
-                open=not field_result.consensus,
-            ):
-                # Show consensus status
+                label=accordion_label,
+                open=not field_result.consensus or has_disag,
+            ) as accordion:
+                field_accordions[field_result.field_name] = accordion
+
+                # Show consensus status with enhanced confidence display
                 if field_result.consensus:
                     gr.Markdown(
                         f"✅ **Consensus detected**: "
-                        f"{field_result.consensus.value} "
-                        f"(confidence: {field_result.consensus.confidence:.2f})"
+                        f"`{field_result.consensus.value}` "
+                        f"**(confidence: {field_result.consensus.confidence:.2%})**"
+                    )
+                elif has_disag:
+                    gr.Markdown(
+                        "🔴 **⚠️ DISAGREEMENT DETECTED** - Multiple candidates "
+                        "with similar confidence. Manual selection required."
                     )
                 else:
                     gr.Markdown("⚠️ **No consensus** - manual selection required")
 
-                # Show candidates
+                # Show candidates with enhanced confidence display
                 if field_result.candidates:
                     gr.Markdown("### Candidates")
-                    # Store candidate choices with indices
+                    # Store candidate choices with enhanced confidence display
                     candidate_choices = [
-                        f"{i}: {c.value} (confidence: {c.confidence:.2f})"
+                        f"{i}: {c.value} (confidence: {c.confidence:.2%})"
                         for i, c in enumerate(field_result.candidates)
                     ]
+                    # No pre-selection for fields with disagreements (User Story 3)
+                    default_value = None
+                    if field_result.consensus and not has_disag:
+                        default_value = (
+                            f"{field_result.candidates.index(field_result.consensus)}: "
+                            f"{field_result.consensus.value} "
+                            f"(confidence: {field_result.consensus.confidence:.2%})"
+                        )
+
                     candidate_radio = gr.Radio(
                         choices=candidate_choices,
                         label="Select Candidate",
-                        value=(
-                            f"{field_result.candidates.index(field_result.consensus)}: "
-                            f"{field_result.consensus.value} "
-                            f"(confidence: {field_result.consensus.confidence:.2f})"
-                            if field_result.consensus
-                            else None
-                        ),
+                        value=default_value,
                     )
                     field_components[f"{field_result.field_name}_candidate"] = (
                         candidate_radio
                     )
 
-                    # Show source context button
+                    # Show source context output
                     source_context_output = gr.Markdown(
                         label="Source Context", visible=False
                     )
 
-                    def make_show_source_fn(
+                    # Create individual "View source" buttons for each candidate
+                    # (User Story 3)
+                    with gr.Row():
+                        for i, candidate in enumerate(field_result.candidates):
+                            with gr.Column(scale=1):
+                                view_source_btn = gr.Button(
+                                    f"View Source {i + 1}",
+                                    size="sm",
+                                )
+
+                                def make_show_source_fn_for_candidate(
+                                    candidate_idx: int,
+                                    candidates: list[Candidate],
+                                ) -> Callable[[], tuple[str, Any]]:
+                                    """Create function to show source for candidate.
+
+                                    Args:
+                                        candidate_idx: Index of the candidate
+                                        candidates: List of candidates for this field
+
+                                    Returns:
+                                        Function to show source context
+                                    """
+
+                                    def show_source() -> tuple[str, Any]:
+                                        """Show source context for candidate.
+
+                                        Returns:
+                                            Tuple of (source_context_markdown,
+                                            visibility_update)
+                                        """
+                                        if 0 <= candidate_idx < len(candidates):
+                                            candidate = candidates[candidate_idx]
+                                            # Use side-by-side if multiple sources
+                                            side_by_side = len(candidate.sources) >= 2
+                                            context = show_source_context(
+                                                candidate.sources,
+                                                side_by_side=side_by_side,
+                                            )
+                                            return context, gr.update(visible=True)
+                                        return "", gr.update(visible=False)
+
+                                    return show_source
+
+                                view_source_btn.click(
+                                    fn=make_show_source_fn_for_candidate(
+                                        i, field_result.candidates
+                                    ),
+                                    inputs=[],
+                                    outputs=[
+                                        source_context_output,
+                                        source_context_output,
+                                    ],
+                                )
+
+                    # Also keep original "View Source Context" button
+                    show_source_btn = gr.Button("View Source for Selected Candidate")
+
+                    def make_show_source_for_selected_fn(
                         candidates: list[Candidate],
                     ) -> Callable[[str], tuple[str, Any]]:
-                        """Create a function to show source context.
+                        """Create a function to show source for selected candidate.
 
                         Args:
                             candidates: List of candidates for this field
@@ -434,7 +543,7 @@ def create_review_interface(  # noqa: PLR0915, C901
                             Function to show source context
                         """
 
-                        def show_source(selected: str) -> tuple[str, Any]:
+                        def show_source_for_selected(selected: str) -> tuple[str, Any]:
                             """Show source context for selected candidate.
 
                             Args:
@@ -446,24 +555,25 @@ def create_review_interface(  # noqa: PLR0915, C901
                             if not selected:
                                 return "", gr.update(visible=False)
 
-                            # Extract candidate index from selection string
                             try:
                                 idx_str = selected.split(":")[0]
                                 idx = int(idx_str)
                                 if 0 <= idx < len(candidates):
                                     candidate = candidates[idx]
-                                    context = show_source_context(candidate.sources)
+                                    side_by_side = len(candidate.sources) >= 2
+                                    context = show_source_context(
+                                        candidate.sources, side_by_side=side_by_side
+                                    )
                                     return context, gr.update(visible=True)
                             except (ValueError, IndexError):
                                 pass
 
                             return "", gr.update(visible=False)
 
-                        return show_source
+                        return show_source_for_selected
 
-                    show_source_btn = gr.Button("View Source Context")
                     show_source_btn.click(
-                        fn=make_show_source_fn(field_result.candidates),
+                        fn=make_show_source_for_selected_fn(field_result.candidates),
                         inputs=[candidate_radio],
                         outputs=[source_context_output, source_context_output],
                     )
@@ -478,9 +588,72 @@ def create_review_interface(  # noqa: PLR0915, C901
                 )
                 field_components[f"{field_result.field_name}_custom"] = custom_value
 
-        # Save button
-        save_button = gr.Button("Save Record", variant="primary")
+        # Filter functionality (User Story 3 + Polish T070)
+        def filter_fields(filter_text: str, filter_type: str) -> list[Any]:
+            """Filter fields based on search text and filter type.
+
+            Args:
+                filter_text: Search text
+                filter_type: Filter type (All, Unresolved, Flagged)
+
+            Returns:
+                List of visibility updates for accordions
+            """
+            filter_lower = filter_text.lower() if filter_text else ""
+            updates = []
+            visible_count = 0
+
+            for field_result in extraction_result.results:
+                field_name = field_result.field_name
+                has_disag = field_disagreements.get(field_name, False)
+
+                # Apply filter type
+                if filter_type == "Unresolved":
+                    # Show only fields without consensus
+                    type_match = field_result.consensus is None
+                elif filter_type == "Flagged (Disagreements)":
+                    # Show only fields with disagreements
+                    type_match = has_disag
+                else:  # "All"
+                    type_match = True
+
+                # Apply text filter
+                text_match = not filter_lower or filter_lower in field_name.lower()
+
+                visible = type_match and text_match
+                if visible:
+                    visible_count += 1
+                updates.append(gr.update(visible=visible))
+
+            return [
+                *updates,
+                gr.update(
+                    visible=True,
+                    value=f"Showing {visible_count} of {len(field_accordions)} fields",
+                ),
+            ]
+
+        def update_filter(filter_text: str, filter_type: str) -> list[Any]:
+            """Update filter when either text or type changes."""
+            return filter_fields(filter_text, filter_type)
+
+        filter_text.change(
+            fn=update_filter,
+            inputs=[filter_text, filter_type],
+            outputs=[*field_accordions.values(), filter_status],
+        )
+        filter_type.change(
+            fn=update_filter,
+            inputs=[filter_text, filter_type],
+            outputs=[*field_accordions.values(), filter_status],
+        )
+
+        # Save and Export buttons (Polish T069)
+        with gr.Row():
+            save_button = gr.Button("Save Record", variant="primary")
+            export_json_button = gr.Button("Export as JSON", variant="secondary")
         save_status = gr.Textbox(label="Save Status", interactive=False)
+        export_json_output = gr.File(label="Exported JSON", visible=False)
 
         def save_resolved_record(  # noqa: PLR0912, PLR0915, C901
             extraction_result: ExtractionResult,
@@ -628,6 +801,149 @@ def create_review_interface(  # noqa: PLR0915, C901
             else:
                 return f"Record saved successfully! Record ID: {record_id}"
 
+        def export_resolved_record_json(  # noqa: PLR0912, PLR0915, C901
+            extraction_result: ExtractionResult,
+            *field_values: str,
+        ) -> tuple[str, Any]:
+            """Export the resolved record as JSON file.
+
+            Args:
+                extraction_result: Original extraction result
+                *field_values: Field values from the form (alternating candidate/custom)
+
+            Returns:
+                Tuple of (status_message, file_path_or_none)
+            """
+            try:
+                # Reuse the same logic as save_resolved_record to build the record
+                resolutions: list[Resolution] = []
+                resolved: dict[str, object] = {}
+                provenance: dict[str, list[SourceRef]] = {}
+
+                # Parse field values (same logic as save_resolved_record)
+                field_idx = 0
+                for field_result in extraction_result.results:
+                    candidate_value = (
+                        field_values[field_idx]
+                        if field_idx < len(field_values)
+                        else None
+                    )
+                    custom_value = (
+                        field_values[field_idx + 1]
+                        if field_idx + 1 < len(field_values)
+                        else None
+                    )
+                    field_idx += 2
+
+                    chosen_value: object | None = None
+                    source_doc_id: str | None = None
+                    source_location: str | None = None
+                    custom_input = False
+                    field_provenance: list[SourceRef] = []
+
+                    if custom_value and custom_value.strip():
+                        custom_value_stripped = custom_value.strip()
+                        if field_result.candidates:
+                            candidate_val: Any = field_result.candidates[0].value
+                            try:
+                                if isinstance(candidate_val, int):
+                                    chosen_value = int(custom_value_stripped)
+                                elif isinstance(candidate_val, float):
+                                    chosen_value = float(custom_value_stripped)
+                                elif isinstance(candidate_val, bool):
+                                    if custom_value_stripped.lower() in (
+                                        "true",
+                                        "1",
+                                        "yes",
+                                    ):
+                                        chosen_value = True
+                                    elif custom_value_stripped.lower() in (
+                                        "false",
+                                        "0",
+                                        "no",
+                                    ):
+                                        chosen_value = False
+                                    else:
+                                        # Invalid boolean value, use as string
+                                        chosen_value = custom_value_stripped
+                                else:
+                                    chosen_value = custom_value_stripped
+                            except (ValueError, TypeError):
+                                chosen_value = custom_value_stripped
+                        else:
+                            chosen_value = custom_value_stripped
+                        custom_input = True
+                    elif candidate_value:
+                        try:
+                            idx_str = candidate_value.split(":")[0]
+                            idx = int(idx_str)
+                            if 0 <= idx < len(field_result.candidates):
+                                candidate = field_result.candidates[idx]
+                                chosen_value = candidate.value
+                                if candidate.sources:
+                                    source_doc_id = candidate.sources[0].doc_id
+                                    source_location = candidate.sources[0].location
+                                    field_provenance = candidate.sources
+                        except (ValueError, IndexError):
+                            pass
+
+                    if chosen_value is not None:
+                        # Convert to list format (Extended Schema)
+                        if field_result.field_name not in resolved:
+                            resolved[field_result.field_name] = []
+                        field_values_list = resolved[field_result.field_name]
+                        if isinstance(field_values_list, list):
+                            field_values_list.append(chosen_value)
+
+                        provenance[field_result.field_name] = field_provenance
+
+                        resolutions.append(
+                            Resolution(
+                                field_name=field_result.field_name,
+                                chosen_value=chosen_value,
+                                source_doc_id=source_doc_id,
+                                source_location=source_location,
+                                custom_input=custom_input,
+                            )
+                        )
+
+                # Create record
+                record_id = slugify(
+                    f"{extraction_result.run_id}_{datetime.now(UTC).isoformat()}"
+                )
+                record = PersistedRecord(
+                    record_id=record_id,
+                    resolved=resolved,
+                    provenance=provenance,
+                    audit={
+                        "run_id": extraction_result.run_id,
+                        "app_version": "0.0.0",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "user": None,
+                        "config": {},
+                        "schema_version": extraction_result.schema_version,
+                    },
+                )
+
+                # Export to JSON file
+                export_data = record.model_dump(mode="json")
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".json", delete=False
+                ) as f:
+                    json.dump(export_data, f, indent=2)
+                    export_path = f.name
+
+                return (
+                    f"Record exported successfully! File: {Path(export_path).name}",
+                    gr.update(value=export_path, visible=True),
+                )
+            except Exception as e:
+                logger.exception("Failed to export record")
+                return (
+                    f"Error exporting record: {e}",
+                    gr.update(visible=False),
+                )
+
         # Store extraction result in a state component for the save function
         extraction_result_state_review = gr.State()
 
@@ -655,6 +971,12 @@ def create_review_interface(  # noqa: PLR0915, C901
             fn=save_resolved_record,
             inputs=[extraction_result_state_review, *list(field_components.values())],
             outputs=[save_status],
+        )
+
+        export_json_button.click(
+            fn=export_resolved_record_json,
+            inputs=[extraction_result_state_review, *list(field_components.values())],
+            outputs=[save_status, export_json_output],
         )
 
     return interface  # type: ignore[no-any-return]

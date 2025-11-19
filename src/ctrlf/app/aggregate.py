@@ -6,6 +6,7 @@ __all__ = (
     "aggregate_field_results",
     "deduplicate_candidates",
     "detect_consensus",
+    "has_disagreement",
     "normalize_value",
 )
 
@@ -150,6 +151,33 @@ def detect_consensus(
             return None
 
     return top_candidate
+
+
+def has_disagreement(
+    candidates: list[Candidate],
+    confidence_threshold: float = 0.75,
+    margin_threshold: float = 0.20,
+) -> bool:
+    """Check if there's a disagreement (no consensus) among candidates.
+
+    A disagreement exists when:
+    - There are multiple candidates, AND
+    - No consensus candidate is detected (confidence or margin thresholds not met)
+
+    Args:
+        candidates: List of deduplicated candidates (sorted by confidence)
+        confidence_threshold: Minimum confidence for consensus (default 0.75)
+        margin_threshold: Minimum margin over next candidate (default 0.20)
+
+    Returns:
+        True if disagreement exists, False otherwise
+    """
+    if len(candidates) < 2:
+        return False  # No disagreement with 0 or 1 candidate
+
+    # If consensus is detected, no disagreement
+    consensus = detect_consensus(candidates, confidence_threshold, margin_threshold)
+    return consensus is None
 
 
 def aggregate_field_results(

@@ -142,19 +142,19 @@ description: "Task list template for feature implementation"
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T055 [P] [US3] Unit test for disagreement detection in tests/unit/test_aggregate.py
-- [ ] T056 [P] [US3] Unit test for confidence score computation in tests/unit/test_aggregate.py
-- [ ] T057 [US3] Integration test for disagreement resolution workflow in tests/integration/test_end_to_end.py
+- [x] T055 [P] [US3] Unit test for disagreement detection in tests/unit/test_aggregate.py
+- [x] T056 [P] [US3] Unit test for confidence score computation in tests/unit/test_aggregate.py
+- [x] T057 [US3] Integration test for disagreement resolution workflow in tests/integration/test_end_to_end.py
 
 ### Implementation for User Story 3
 
-- [ ] T058 [US3] Enhance detect_consensus to flag disagreements in src/ctrlf/app/aggregate.py (depends on T031)
-- [ ] T059 [US3] Add confidence score display to review interface in src/ctrlf/app/ui.py (depends on T036)
-- [ ] T060 [US3] Add visual flagging for fields with disagreements in src/ctrlf/app/ui.py (depends on T036, T058)
-- [ ] T061 [US3] Enhance show_source_context to support side-by-side comparison in src/ctrlf/app/ui.py (depends on T037)
-- [ ] T062 [US3] Add "View source" button functionality for each candidate in src/ctrlf/app/ui.py (depends on T037, T059)
-- [ ] T063 [US3] Add filter/search functionality for fields in review interface in src/ctrlf/app/ui.py (depends on T036)
-- [ ] T064 [US3] Ensure no pre-selection for fields with disagreements in src/ctrlf/app/ui.py (depends on T036, T058)
+- [x] T058 [US3] Enhance detect_consensus to flag disagreements in src/ctrlf/app/aggregate.py (depends on T031)
+- [x] T059 [US3] Add confidence score display to review interface in src/ctrlf/app/ui.py (depends on T036)
+- [x] T060 [US3] Add visual flagging for fields with disagreements in src/ctrlf/app/ui.py (depends on T036, T058)
+- [x] T061 [US3] Enhance show_source_context to support side-by-side comparison in src/ctrlf/app/ui.py (depends on T037)
+- [x] T062 [US3] Add "View source" button functionality for each candidate in src/ctrlf/app/ui.py (depends on T037, T059)
+- [x] T063 [US3] Add filter/search functionality for fields in review interface in src/ctrlf/app/ui.py (depends on T036)
+- [x] T064 [US3] Ensure no pre-selection for fields with disagreements in src/ctrlf/app/ui.py (depends on T036, T058)
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -165,11 +165,11 @@ description: "Task list template for feature implementation"
 **Purpose**: Improvements that affect multiple user stories
 
 - [ ] T065 [P] Add progress indicators with cancellation support in src/ctrlf/app/ui.py
-- [ ] T066 [P] Add error summary display at end of processing in src/ctrlf/app/ui.py
-- [ ] T067 [P] Add null policy configuration option in src/ctrlf/app/ui.py
+- [x] T066 [P] Add error summary display at end of processing in src/ctrlf/app/ui.py
+- [x] T067 [P] Add null policy configuration option in src/ctrlf/app/ui.py
 - [ ] T068 [P] Add PII redaction option for UI previews in src/ctrlf/app/ui.py
-- [ ] T069 [P] Add JSON export functionality for saved records in src/ctrlf/app/ui.py (depends on T034)
-- [ ] T070 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
+- [x] T069 [P] Add JSON export functionality for saved records in src/ctrlf/app/ui.py (depends on T034)
+- [x] T070 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
 - [ ] T071 [P] Update README.md with installation and usage instructions
 - [ ] T072 [P] Add docstrings to all public functions and classes
 - [ ] T073 Code cleanup and refactoring
