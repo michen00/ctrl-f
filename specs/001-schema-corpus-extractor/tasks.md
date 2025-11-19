@@ -164,7 +164,7 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T065 [P] Add progress indicators with cancellation support in src/ctrlf/app/ui.py
+- [x] T065 [P] Add progress indicators with cancellation support in src/ctrlf/app/ui.py
 - [x] T066 [P] Add error summary display at end of processing in src/ctrlf/app/ui.py
 - [x] T067 [P] Add null policy configuration option in src/ctrlf/app/ui.py
 - [ ] T068 [P] Add PII redaction option for UI previews in src/ctrlf/app/ui.py
