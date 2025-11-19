@@ -172,7 +172,7 @@ description: "Task list template for feature implementation"
 - [ ] T070 [P] Update README.md with installation and usage instructions
 - [x] T071 [P] Add docstrings to all public functions and classes
 - [ ] T072 Code cleanup and refactoring
-- [ ] T073 [P] Performance optimization across all modules (target SC-001: <10min workflow, SC-002: 5 docs/min, SC-005: <2s source view)
+- [ ] T073 [P] Performance optimization across all modules
 - [x] T074 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
 - [ ] T075 Run quickstart.md validation
 
