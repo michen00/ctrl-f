@@ -115,7 +115,7 @@ description: "Task list template for feature implementation"
 - [x] T043 [P] [US2] Unit test for Pydantic model import in tests/unit/test_schema_io.py
 - [x] T044 [P] [US2] Unit test for schema extension (array coercion) in tests/unit/test_schema_io.py
 - [x] T045 [P] [US2] Unit test for nested schema rejection in tests/unit/test_schema_io.py
-- [ ] T046 [US2] Integration test for Pydantic model workflow in tests/integration/test_end_to_end.py
+- [x] T046 [US2] Integration test for Pydantic model workflow in tests/integration/test_end_to_end.py
 
 ### Implementation for User Story 2
 

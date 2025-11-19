@@ -43,6 +43,9 @@ ignore = [
     "TD002",   # missing-todo-author
     "TD003",   # missing-todo-link
 ]
+external = [
+    "PLC", # pylint-convention
+]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable   = ["ALL"]

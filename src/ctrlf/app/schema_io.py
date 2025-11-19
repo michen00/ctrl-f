@@ -195,7 +195,7 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
     return model_class
 
 
-def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:  # noqa: PLR0912
+def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
     """Create Extended Schema by coercing all fields to arrays.
 
     Args:

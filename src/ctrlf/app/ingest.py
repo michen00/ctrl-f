@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = "CorpusDocument", "convert_document_to_markdown", "process_corpus"
 
 import hashlib
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -155,11 +156,14 @@ def process_corpus(
 
     results: list[CorpusDocument] = []
     files_to_process: list[Path] = []
+    temp_dir_context: tempfile.TemporaryDirectory[str] | None = None
 
     # Collect files to process
     if path.is_file():
         # Handle zip/tar archives
         if path.suffix.lower() == ".zip":
+            temp_dir_context = tempfile.TemporaryDirectory(prefix="ctrlf_extract_")
+            temp_dir = Path(temp_dir_context.name)
             with zipfile.ZipFile(path, "r") as zip_ref:
                 for member in zip_ref.namelist():
                     member_path = Path(member)
@@ -171,8 +175,6 @@ def process_corpus(
                         ".md",
                     }:
                         # Extract to temp location
-                        temp_dir = Path.cwd() / ".temp_extract"
-                        temp_dir.mkdir(exist_ok=True)
                         zip_ref.extract(member, temp_dir)
                         files_to_process.append(temp_dir / member)
         else:
@@ -186,27 +188,34 @@ def process_corpus(
     total_files = len(files_to_process)
     logger.info("corpus_processing_started", total_files=total_files)
 
-    # Process each file
-    for idx, file_path in enumerate(files_to_process, 1):
-        try:
-            markdown, source_map = convert_document_to_markdown(str(file_path))
-            doc_id = _generate_doc_id(str(file_path))
-            results.append(
-                CorpusDocument(doc_id=doc_id, markdown=markdown, source_map=source_map)
-            )
+    try:
+        # Process each file
+        for idx, file_path in enumerate(files_to_process, 1):
+            try:
+                markdown, source_map = convert_document_to_markdown(str(file_path))
+                doc_id = _generate_doc_id(str(file_path))
+                results.append(
+                    CorpusDocument(
+                        doc_id=doc_id, markdown=markdown, source_map=source_map
+                    )
+                )
 
-            if progress_callback:
-                progress_callback(idx, total_files)
+                if progress_callback:
+                    progress_callback(idx, total_files)
 
-        except Exception as e:  # noqa: BLE001
-            logger.warning(
-                "file_processing_failed",
-                file_path=str(file_path),
-                error=str(e),
-            )
-            # Continue processing other files
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "file_processing_failed",
+                    file_path=str(file_path),
+                    error=str(e),
+                )
+                # Continue processing other files
 
-    logger.info(
-        "corpus_processing_completed", processed=len(results), total=total_files
-    )
-    return results
+        logger.info(
+            "corpus_processing_completed", processed=len(results), total=total_files
+        )
+        return results
+    finally:
+        # Clean up temporary directory if it was created
+        if temp_dir_context is not None:
+            temp_dir_context.cleanup()
