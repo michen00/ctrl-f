@@ -59,7 +59,7 @@ def _extract_snippet(markdown: str, start: int, end: int, context: int = 50) -> 
         context: Number of characters of context on each side
 
     Returns:
-        Snippet string
+        Snippet string (guaranteed to be at least 10 characters)
     """
     snippet_start = max(0, start - context)
     snippet_end = min(len(markdown), end + context)
@@ -67,6 +67,14 @@ def _extract_snippet(markdown: str, start: int, end: int, context: int = 50) -> 
     # Ensure snippet is at least 10 characters
     if len(snippet) < 10:
         snippet = markdown[max(0, start - 5) : min(len(markdown), end + 5)]
+        # If still too short, use entire document or pad if necessary
+        if len(snippet) < 10:
+            if len(markdown) >= 10:
+                # Use entire document if it's long enough
+                snippet = markdown
+            else:
+                # Pad with spaces to reach minimum length
+                snippet = markdown + " " * (10 - len(markdown))
     return snippet
 
 

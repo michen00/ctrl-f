@@ -4,6 +4,7 @@ from __future__ import annotations
 
 __all__ = (
     "ExtractionWorkflowResult",
+    "UnpackedResult",
     "create_review_interface",
     "create_upload_interface",
     "show_source_context",
@@ -57,6 +58,19 @@ class ExtractionWorkflowResult(NamedTuple):
     error_message: str
     extraction_result: ExtractionResult | None
     error_visibility: Any
+
+
+class UnpackedResult(NamedTuple):
+    """Unpacked result for Gradio outputs."""
+
+    progress_message: str
+    """Progress status message"""
+
+    error_update: Any
+    """Gradio update object for error output"""
+
+    extraction_result: ExtractionResult | None
+    """Extraction result or None if failed"""
 
 
 def _safe_snippet(snippet: str) -> str:
@@ -163,7 +177,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
         )
         extraction_result_state = gr.State()
 
-        def run_extraction_workflow(  # noqa: PLR0915, PLR0912
+        def run_extraction_workflow(  # noqa: PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
@@ -300,20 +314,26 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
         def unpack_result(
             result: ExtractionWorkflowResult,
-        ) -> tuple[str, str, ExtractionResult | None, Any]:
+        ) -> UnpackedResult:
             """Unpack ExtractionWorkflowResult for Gradio outputs.
 
             Args:
                 result: Extraction workflow result
 
             Returns:
-                Tuple unpacked for Gradio outputs
+                UnpackedResult with progress_message, error_update, and
+                extraction_result
             """
-            return (
-                result.progress_message,
-                result.error_message,
-                result.extraction_result,
-                result.error_visibility,
+            # Combine error message and visibility into a single gr.update() object
+            # Show error output if there's an error message, hide otherwise
+            error_update = gr.update(
+                value=result.error_message,
+                visible=bool(result.error_message),
+            )
+            return UnpackedResult(
+                progress_message=result.progress_message,
+                error_update=error_update,
+                extraction_result=result.extraction_result,
             )
 
         run_button.click(
@@ -330,7 +350,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 progress_output,
                 error_output,
                 extraction_result_state,
-                error_output,
             ],
         )
 

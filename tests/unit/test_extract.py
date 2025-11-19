@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ctrlf.app.extract import extract_field_candidates, run_extraction
+from ctrlf.app.extract import (
+    _extract_snippet,
+    extract_field_candidates,
+    run_extraction,
+)
 from ctrlf.app.ingest import CorpusDocument
 from ctrlf.app.models import Candidate, ExtractionResult, SourceRef
 
@@ -141,3 +145,37 @@ class TestRunExtraction:
         # Should not raise, should continue processing
         result = run_extraction(TestModel, corpus_docs)
         assert isinstance(result, ExtractionResult)
+
+
+class TestExtractSnippet:
+    """Test snippet extraction function."""
+
+    def test_extract_snippet_ensures_minimum_length(self) -> None:
+        """Test that _extract_snippet always returns at least 10 characters."""
+        # Test case: very short document
+        markdown = "Hi"
+        snippet = _extract_snippet(markdown, start=0, end=2)
+        assert len(snippet) >= 10
+
+    def test_extract_snippet_short_span_in_short_doc(self) -> None:
+        """Test snippet extraction with short span in short document."""
+        # Document is 5 characters, span is 2 characters
+        markdown = "Hello"
+        snippet = _extract_snippet(markdown, start=0, end=2)
+        assert len(snippet) >= 10
+
+    def test_extract_snippet_very_short_document(self) -> None:
+        """Test snippet extraction with document shorter than 10 chars."""
+        # Document is only 3 characters
+        markdown = "Hi!"
+        snippet = _extract_snippet(markdown, start=0, end=3)
+        assert len(snippet) >= 10
+
+    def test_extract_snippet_normal_case(self) -> None:
+        """Test snippet extraction in normal case with sufficient content."""
+        markdown = (
+            "This is a longer document with plenty of content to extract snippets from."
+        )
+        snippet = _extract_snippet(markdown, start=10, end=20)
+        assert len(snippet) >= 10
+        assert "longer" in snippet or "document" in snippet
