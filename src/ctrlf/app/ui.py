@@ -192,12 +192,13 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
     Raises:
         ValueError: If archive format is unsupported or archive contains unsafe paths
     """
+
     def _is_within_directory(base: Path, target: Path) -> bool:
         try:
             base = base.resolve(strict=False)
             target = target.resolve(strict=False)
             return str(target).startswith(str(base))
-        except Exception:
+        except (OSError, RuntimeError):
             return False
 
     archive_lower = archive_path.lower()
@@ -208,12 +209,16 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
                 member_path = Path(member.filename)
                 dest_path = (extract_to_path / member_path).resolve(strict=False)
                 if not _is_within_directory(extract_to_path, dest_path):
-                    raise ValueError(f"Unsafe path detected in zip archive: {member.filename}")
+                    msg = f"Unsafe path detected in zip archive: {member.filename}"
+                    raise ValueError(msg)
                 if member.is_dir():
                     dest_path.mkdir(parents=True, exist_ok=True)
                 else:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    with zip_ref.open(member, "r") as source, open(dest_path, "wb") as target:
+                    with (
+                        zip_ref.open(member, "r") as source,
+                        dest_path.open("wb") as target,
+                    ):
                         shutil.copyfileobj(source, target)
     elif archive_lower.endswith((".tar", ".tar.gz")):
         mode = "r:gz" if archive_lower.endswith(".tar.gz") else "r"
@@ -222,13 +227,15 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
                 member_path = Path(member.name)
                 dest_path = (extract_to_path / member_path).resolve(strict=False)
                 if not _is_within_directory(extract_to_path, dest_path):
-                    raise ValueError(f"Unsafe path detected in tar archive: {member.name}")
+                    msg = f"Unsafe path detected in tar archive: {member.name}"
+                    raise ValueError(msg)
                 if member.isdir():
                     dest_path.mkdir(parents=True, exist_ok=True)
                 else:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    with tar_ref.extractfile(member) as source, open(dest_path, "wb") as target:
-                        if source is not None:
+                    source = tar_ref.extractfile(member)
+                    if source is not None:
+                        with source, dest_path.open("wb") as target:
                             shutil.copyfileobj(source, target)
     else:
         msg = f"Unsupported archive format: {archive_path}"
@@ -1143,24 +1150,34 @@ def create_review_interface(  # noqa: PLR0915, C901
                         def show_source_for_selected(selected: str) -> tuple[str, Any]:
                             """Show source context for selected candidate.
 
+                            Args:
+                                selected: Radio button selection in format
+                                    "index: value (confidence: XX%)"
+
                             Returns:
                                 Tuple of (source_context_markdown, visibility_update)
                             """
                             if not selected:
                                 return "", gr.update(visible=False)
 
+                            # Extract index from format "index: value (confidence: XX%)"
+                            # Use partition to safely split on first colon
+                            idx_str, _colon, _rest = selected.partition(":")
+                            if not idx_str or not _colon:
+                                return "", gr.update(visible=False)
+
                             try:
-                                idx_str = selected.split(":")[0]
-                                idx = int(idx_str)
-                                if 0 <= idx < len(candidates):
-                                    candidate = candidates[idx]
-                                    side_by_side = len(candidate.sources) >= 2
-                                    context = show_source_context(
-                                        candidate.sources, side_by_side=side_by_side
-                                    )
-                                    return context, gr.update(visible=True)
-                            except (ValueError, IndexError):
-                                pass
+                                idx = int(idx_str.strip())
+                            except ValueError:
+                                return "", gr.update(visible=False)
+
+                            if 0 <= idx < len(candidates):
+                                candidate = candidates[idx]
+                                side_by_side = len(candidate.sources) >= 2
+                                context = show_source_context(
+                                    candidate.sources, side_by_side=side_by_side
+                                )
+                                return context, gr.update(visible=True)
 
                             return "", gr.update(visible=False)
 
