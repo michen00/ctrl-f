@@ -112,6 +112,7 @@ repos:
           ]
         additional_dependencies:
           - gradio
+          - json_schema_to_pydantic
           - langextract
           - nox[uv]
           - pydantic[mypy]

@@ -115,23 +115,35 @@ class TestConvertJsonSchemaToPydantic:
         instance = model_cls(name="Test")
         assert instance.count == 0  # type: ignore[attr-defined]
 
-    def test_nested_object_raises_error(self) -> None:
-        """Test that nested objects raise SchemaError (T045)."""
+    def test_nested_object_supported(self) -> None:
+        """Test that nested objects are now supported."""
         schema = {
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
                 "address": {
                     "type": "object",
-                    "properties": {"street": {"type": "string"}},
+                    "properties": {
+                        "street": {"type": "string"},
+                        "city": {"type": "string"},
+                    },
                 },
             },
         }
-        with pytest.raises(SchemaError, match="Nested objects not supported"):
-            convert_json_schema_to_pydantic(schema)
+        model_cls = convert_json_schema_to_pydantic(schema)
+        assert issubclass(model_cls, BaseModel)
 
-    def test_nested_array_of_objects_raises_error(self) -> None:
-        """Test that nested arrays of objects raise SchemaError (T045)."""
+        # Test instantiation with nested object
+        instance = model_cls(
+            name="John",
+            address={"street": "123 Main St", "city": "New York"},
+        )
+        assert instance.name == "John"  # type: ignore[attr-defined]
+        assert instance.address.street == "123 Main St"  # type: ignore[attr-defined]
+        assert instance.address.city == "New York"  # type: ignore[attr-defined]
+
+    def test_nested_array_of_objects_supported(self) -> None:
+        """Test that nested arrays of objects are now supported."""
         schema = {
             "type": "object",
             "properties": {
@@ -145,8 +157,18 @@ class TestConvertJsonSchemaToPydantic:
                 },
             },
         }
-        with pytest.raises(SchemaError, match="Nested arrays of objects not supported"):
-            convert_json_schema_to_pydantic(schema)
+        model_cls = convert_json_schema_to_pydantic(schema)
+        assert issubclass(model_cls, BaseModel)
+
+        # Test instantiation with nested array of objects
+        instance = model_cls(
+            name="John",
+            items=[{"value": "item1"}, {"value": "item2"}],
+        )
+        assert instance.name == "John"  # type: ignore[attr-defined]
+        assert len(instance.items) == 2  # type: ignore[attr-defined]
+        assert instance.items[0].value == "item1"  # type: ignore[attr-defined]
+        assert instance.items[1].value == "item2"  # type: ignore[attr-defined]
 
     def test_primitive_array_allowed(self) -> None:
         """Test that primitive arrays are allowed."""
@@ -212,8 +234,8 @@ class NotAModel:
         with pytest.raises(SchemaError, match="No BaseModel subclass found"):
             import_pydantic_model(code)
 
-    def test_multiple_basemodels_raises_error(self) -> None:
-        """Test that multiple BaseModel classes raise SchemaError."""
+    def test_multiple_basemodels_uses_last_one(self) -> None:
+        """Test that multiple BaseModel classes use the last one defined."""
         code = """
 from pydantic import BaseModel
 
@@ -223,8 +245,16 @@ class Model1(BaseModel):
 class Model2(BaseModel):
     field2: str
 """
-        with pytest.raises(SchemaError, match="Multiple BaseModel subclasses found"):
-            import_pydantic_model(code)
+        # Should return the last BaseModel defined (Model2)
+        model_cls = import_pydantic_model(code)
+        assert model_cls.__name__ == "Model2"
+
+        # Verify it's the correct model
+        instance = model_cls(field2="test")
+        assert instance.field2 == "test"  # type: ignore[attr-defined]
+
+        # Verify Model1 is not returned
+        assert model_cls.__name__ != "Model1"
 
 
 class TestExtendSchema:
@@ -338,11 +368,77 @@ class Person(BaseModel):
             extended_model(name="John", age=30)
 
 
-class TestNestedSchemaRejection:
-    """Tests for nested schema rejection (T045)."""
+class TestNestedSchemaExtension:
+    """Tests for nested schema extension (array coercion with nested objects)."""
 
-    def test_nested_object_in_pydantic_raises_error(self) -> None:
-        """Test that Pydantic models with nested objects are rejected."""
+    def test_extend_schema_with_nested_object(self) -> None:
+        """Test extending schema with nested objects."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "address": {
+                    "type": "object",
+                    "properties": {
+                        "street": {"type": "string"},
+                        "city": {"type": "string"},
+                    },
+                },
+            },
+        }
+        original_model = convert_json_schema_to_pydantic(schema)
+        extended_model = extend_schema(original_model)
+
+        # Extended model should have nested fields as arrays
+        instance = extended_model(
+            name=["John"],
+            address=[{"street": ["123 Main St"], "city": ["New York"]}],
+        )
+        assert instance.name == ["John"]  # type: ignore[attr-defined]
+        assert len(instance.address) == 1  # type: ignore[attr-defined]
+        assert instance.address[0].street == ["123 Main St"]  # type: ignore[attr-defined]
+        assert instance.address[0].city == ["New York"]  # type: ignore[attr-defined]
+
+    def test_extend_schema_with_nested_array_of_objects(self) -> None:
+        """Test extending schema with nested arrays of objects."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"value": {"type": "string"}},
+                    },
+                },
+            },
+        }
+        original_model = convert_json_schema_to_pydantic(schema)
+        extended_model = extend_schema(original_model)
+
+        # Extended model should have nested array fields as arrays
+        # When extending list[ItemModel], it becomes list[ExtendedItemModel]
+        # (not list[list[ExtendedItemModel]])
+        instance = extended_model(
+            name=["John"],
+            items=[{"value": ["item1"]}, {"value": ["item2"]}],
+        )
+        assert instance.name == ["John"]  # type: ignore[attr-defined]
+        assert len(instance.items) == 2  # type: ignore[attr-defined]
+        assert instance.items[0].value == ["item1"]  # type: ignore[attr-defined]
+        assert instance.items[1].value == ["item2"]  # type: ignore[attr-defined]
+
+
+class TestImportPydanticModelRestrictions:
+    """Tests for import_pydantic_model restrictions (single model only)."""
+
+    def test_multiple_basemodels_uses_last_one(self) -> None:
+        """Test that import_pydantic_model uses the last BaseModel defined.
+
+        When multiple BaseModel classes are present, the last one defined
+        is treated as the top-level schema.
+        """
         code = """
 from pydantic import BaseModel
 
@@ -353,25 +449,12 @@ class Person(BaseModel):
     name: str
     address: Address
 """
-        # Multiple BaseModel classes are rejected during import
-        # (Address is a nested model, Person is the main model)
-        with pytest.raises(SchemaError, match="Multiple BaseModel subclasses found"):
-            import_pydantic_model(code)
+        # Should return the last BaseModel defined (Person)
+        model_cls = import_pydantic_model(code)
+        assert model_cls.__name__ == "Person"
 
-    def test_nested_array_in_pydantic_raises_error(self) -> None:
-        """Test that Pydantic models with nested arrays of objects are rejected."""
-        code = """
-from pydantic import BaseModel
-from typing import List
-
-class Item(BaseModel):
-    value: str
-
-class Person(BaseModel):
-    name: str
-    items: List[Item]
-"""
-        # Multiple BaseModel classes are rejected during import
-        # (Item is a nested model, Person is the main model)
-        with pytest.raises(SchemaError, match="Multiple BaseModel subclasses found"):
-            import_pydantic_model(code)
+        # Verify it works correctly with nested models
+        # Use dict for nested model since Address class is not in test scope
+        instance = model_cls(name="John", address={"street": "123 Main St"})
+        assert instance.name == "John"  # type: ignore[attr-defined]
+        assert instance.address.street == "123 Main St"  # type: ignore[attr-defined]
