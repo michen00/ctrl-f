@@ -34,8 +34,9 @@ def normalize_value(value: object, field_type: type) -> object:  # noqa: C901, P
         if isinstance(value, str):
             # Trim whitespace
             normalized = value.strip()
-            # Normalize email addresses
-            if "@" in normalized and "." in normalized.split("@")[1]:
+            # Normalize email addresses (lowercase all emails,
+            # regardless of domain format)
+            if "@" in normalized:
                 normalized = normalized.lower()
             return normalized
         # Convert to string and trim
