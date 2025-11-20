@@ -478,8 +478,42 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                 extraction_result=result.extraction_result,
             )
 
+        def run_extraction_with_progress(
+            schema_file_path: str | None,
+            schema_type_str: str,
+            corpus_file_path: str | None,
+            corpus_dir_path: str | None,
+            _null_policy_str: str,
+            _confidence: float,
+            progress: gr.Progress,
+        ) -> UnpackedResult:
+            """Wrapper to run extraction workflow and unpack result.
+
+            Args:
+                schema_file_path: Path to schema file
+                schema_type_str: Type of schema (JSON Schema or Pydantic Model)
+                corpus_file_path: Path to corpus archive
+                corpus_dir_path: Path to corpus directory
+                _null_policy_str: Null policy setting (unused in v0)
+                _confidence: Confidence threshold (unused in v0)
+                progress: Gradio progress tracker
+
+            Returns:
+                UnpackedResult for Gradio outputs
+            """
+            result = run_extraction_workflow(
+                schema_file_path,
+                schema_type_str,
+                corpus_file_path,
+                corpus_dir_path,
+                _null_policy_str,
+                _confidence,
+                progress,
+            )
+            return unpack_result(result)
+
         run_button.click(
-            fn=lambda *args: unpack_result(run_extraction_workflow(*args)),
+            fn=run_extraction_with_progress,
             inputs=[
                 schema_file,
                 schema_type,
