@@ -18,16 +18,18 @@ from ctrlf.app.models import Candidate, FieldResult
 logger = get_logger(__name__)
 
 
-def normalize_value(value: object, field_type: type) -> object:
+def normalize_value(value: object, field_type: type) -> object:  # noqa: C901, PLR0911, PLR0912
     """Normalize a candidate value based on field type.
 
     Args:
         value: Raw candidate value
-        field_type: Schema field type
+        field_type: Schema field type (expected type from schema, not runtime type)
 
     Returns:
-        Normalized value (e.g., lowercase email, ISO date, trimmed string)
+        Normalized value (e.g., lowercase email, ISO date, trimmed string,
+        type-converted values)
     """
+    # First, convert to the expected field type if needed
     if field_type is str:
         if isinstance(value, str):
             # Trim whitespace
@@ -36,7 +38,41 @@ def normalize_value(value: object, field_type: type) -> object:
             if "@" in normalized and "." in normalized.split("@")[1]:
                 normalized = normalized.lower()
             return normalized
+        # Convert to string and trim
         return str(value).strip()
+
+    if field_type is int:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, (str, float)):
+            try:
+                return int(float(value))  # Convert via float to handle "3.14" -> 3
+            except (ValueError, TypeError):
+                pass
+        return value
+
+    if field_type is float:
+        if isinstance(value, float):
+            return value
+        if isinstance(value, (str, int)):
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                pass
+        return value
+
+    if field_type is bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized_str = value.strip().lower()
+            if normalized_str in {"true", "1", "yes", "y", "on"}:
+                return True
+            if normalized_str in {"false", "0", "no", "n", "off"}:
+                return False
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return value
 
     # For other types, return as-is (can be extended)
     return value
@@ -58,8 +94,11 @@ def deduplicate_candidates(
     if not candidates:
         return []
 
-    # Convert values to strings for comparison
-    candidate_strings = [str(c.value) for c in candidates]
+    # Convert normalized values to strings for comparison
+    # Use normalized value if available, fallback to raw value
+    candidate_strings = [
+        str(c.normalized if c.normalized is not None else c.value) for c in candidates
+    ]
 
     # Group similar candidates
     groups: list[list[int]] = []
@@ -183,20 +222,23 @@ def has_disagreement(
 def aggregate_field_results(
     field_name: str,
     candidates: list[Candidate],
+    field_type: type = str,
 ) -> FieldResult:
     """Aggregate candidates for a field into FieldResult with consensus detection.
 
     Args:
         field_name: Schema field name
         candidates: All candidates for this field
+        field_type: Expected schema field type (defaults to str for backward
+            compatibility)
 
     Returns:
         Aggregated results with consensus if detected
     """
-    # Normalize candidates
+    # Normalize candidates using the schema field type, not the runtime type
     normalized_candidates = []
     for candidate in candidates:
-        normalized_value = normalize_value(candidate.value, type(candidate.value))
+        normalized_value = normalize_value(candidate.value, field_type)
         normalized_candidate = Candidate(
             value=candidate.value,
             normalized=normalized_value,

@@ -33,6 +33,38 @@ class TestNormalizeValue:
         # Should return original or normalized version
         assert normalized is not None
 
+    def test_normalize_string_to_float(self) -> None:
+        """Test that string values are converted to float when field_type is float."""
+        # String "3.14" should be converted to float 3.14 for a float field
+        normalized = normalize_value("3.14", float)
+        assert isinstance(normalized, float)
+        assert normalized == 3.14
+
+    def test_normalize_string_to_int(self) -> None:
+        """Test that string values are converted to int when field_type is int."""
+        # String "42" should be converted to int 42 for an int field
+        normalized = normalize_value("42", int)
+        assert isinstance(normalized, int)
+        assert normalized == 42
+
+    def test_normalize_string_to_int_from_float_string(self) -> None:
+        """Test that float-like strings are converted to int when field_type is int."""
+        # String "3.14" should be converted to int 3 for an int field
+        normalized = normalize_value("3.14", int)
+        assert isinstance(normalized, int)
+        assert normalized == 3
+
+    def test_normalize_uses_schema_type_not_runtime_type(self) -> None:
+        """Test that normalization uses schema field type, not runtime value type."""
+        # A string "3.14" extracted for a float field should be normalized as float
+        # not as a string (this was the bug being fixed)
+        value = "3.14"  # Runtime type is str
+        normalized = normalize_value(value, float)  # Schema type is float
+        assert isinstance(normalized, float)
+        assert normalized == 3.14
+        # Should NOT be normalized as a string
+        assert not isinstance(normalized, str)  # type: ignore[unreachable]
+
 
 class TestDeduplicateCandidates:
     """Test candidate deduplication."""
@@ -73,6 +105,45 @@ class TestDeduplicateCandidates:
         # All deduplicated candidates should have sources
         for candidate in deduplicated:
             assert len(candidate.sources) > 0
+
+    def test_deduplicate_uses_normalized_values(self) -> None:
+        """Test that deduplication uses normalized values for comparison."""
+        source1 = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="page 1",
+            snippet="Email: JOHN.DOE@EXAMPLE.COM",
+        )
+        source2 = SourceRef(
+            doc_id="doc2",
+            path="doc2.txt",
+            location="page 2",
+            snippet="Contact: john.doe@example.com",
+        )
+
+        # Candidates with different case but same normalized form
+        candidates = [
+            Candidate(
+                value="JOHN.DOE@EXAMPLE.COM",
+                normalized="john.doe@example.com",  # Normalized (lowercase)
+                confidence=0.9,
+                sources=[source1],
+            ),
+            Candidate(
+                value="john.doe@example.com",
+                normalized="john.doe@example.com",  # Same normalized form
+                confidence=0.85,
+                sources=[source2],
+            ),
+        ]
+
+        deduplicated = deduplicate_candidates(candidates, similarity_threshold=0.85)
+        # Should deduplicate because normalized values match
+        assert len(deduplicated) == 1
+        # Merged candidate should have both sources
+        assert len(deduplicated[0].sources) == 2
+        # Should use normalized value for comparison
+        assert deduplicated[0].normalized == "john.doe@example.com"
 
     def test_deduplicate_sorted_by_confidence(self) -> None:
         """Test that deduplicated candidates are sorted by confidence."""
@@ -200,7 +271,7 @@ class TestAggregateFieldResults:
             ),
         ]
 
-        field_result = aggregate_field_results("test_field", candidates)
+        field_result = aggregate_field_results("test_field", candidates, field_type=str)
         assert isinstance(field_result, FieldResult)
         assert field_result.field_name == "test_field"
         assert len(field_result.candidates) > 0

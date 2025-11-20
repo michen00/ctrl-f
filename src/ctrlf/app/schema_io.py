@@ -254,15 +254,18 @@ def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
         else:
             extended_type = list[original_type]  # type: ignore[valid-type]
 
-        # Preserve default value if present
+        # Preserve default value if present, wrapping in list for array types
         default_value = field_info.default if field_info.default is not ... else ...
         if default_value is ...:
+            # Required field - no default
             field_definitions[field_name] = (extended_type, ...)
-        # Default should be None for Optional types, or [] for list types
-        elif origin is Union or origin is type(None):
+        elif default_value is None:
+            # None default - preserve None (for Optional types)
             field_definitions[field_name] = (extended_type, None)
         else:
-            field_definitions[field_name] = (extended_type, [])
+            # Has explicit non-None default value - wrap in list to match array type
+            # e.g., default="value" becomes default=["value"]
+            field_definitions[field_name] = (extended_type, [default_value])
 
     # Create extended model
     extended_model_name = f"Extended{model_cls.__name__}"
