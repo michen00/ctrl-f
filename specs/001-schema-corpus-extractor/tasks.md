@@ -174,7 +174,7 @@ description: "Task list template for feature implementation"
 - [ ] T072 Code cleanup and refactoring
 - [ ] T073 [P] Performance optimization across all modules
 - [x] T074 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
-- [ ] T075 Run quickstart.md validation
+- [x] T075 Run quickstart.md validation
 
 ---
 
