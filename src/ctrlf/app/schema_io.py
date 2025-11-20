@@ -16,6 +16,7 @@ from typing import Any, Union, get_args, get_origin
 
 import jsonschema
 from pydantic import BaseModel, create_model
+from pydantic_core import PydanticUndefined
 
 from ctrlf.app.errors import SchemaError
 
@@ -255,8 +256,9 @@ def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
             extended_type = list[original_type]  # type: ignore[valid-type]
 
         # Preserve default value if present, wrapping in list for array types
-        default_value = field_info.default if field_info.default is not ... else ...
-        if default_value is ...:
+        # Check for PydanticUndefined (no default) or Ellipsis (required field)
+        default_value = field_info.default
+        if default_value is PydanticUndefined or default_value is ...:
             # Required field - no default
             field_definitions[field_name] = (extended_type, ...)
         elif default_value is None:
