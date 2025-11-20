@@ -41,16 +41,9 @@ def _create_source_ref(
     path: str,
     location: str,
     snippet: str,
-    meta: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> SourceRef:
     """Create a SourceRef from extraction span information.
-
-    Args:
-        doc_id: Document identifier
-        path: File path
-        location: Location descriptor
-        snippet: Context snippet
-        meta: Optional metadata
 
     Returns:
         SourceRef instance
@@ -60,7 +53,7 @@ def _create_source_ref(
         path=path,
         location=location,
         snippet=snippet,
-        meta=meta or {},
+        metadata=metadata or {},
     )
 
 
@@ -97,11 +90,6 @@ def _extract_location_from_source_map(
     source_map: dict[str, Any], span_start: int, span_end: int
 ) -> str:
     """Extract location from source map.
-
-    Args:
-        source_map: Source mapping dictionary
-        span_start: Start position
-        span_end: End position
 
     Returns:
         Location descriptor
@@ -161,10 +149,6 @@ def generate_example_extractions(
     schema: str, example_text: str
 ) -> tuple[list[Extraction], PrePromptInteraction]:
     """Generate example extractions using Google Gen AI.
-
-    Args:
-        schema: The schema definition
-        example_text: The synthetic example text
 
     Returns:
         Tuple of (list of langextract Extraction objects, instrumentation data)
@@ -378,11 +362,6 @@ def _process_document(
 ) -> list[tuple[str, Candidate]]:
     """Process a single document and extract candidates.
 
-    Args:
-        doc: Corpus document
-        prompt_description: Prompt description
-        example_data: Example data
-
     Returns:
         List of (field_name, Candidate) tuples
     """
@@ -430,7 +409,7 @@ def _process_document(
                     ),
                     location=location,
                     snippet=snippet,
-                    meta={
+                    metadata={
                         "span_start": span_start,
                         "span_end": span_end,
                         **doc.source_map,
@@ -458,12 +437,7 @@ def _process_document(
 
 
 def _visualize_result(annotated_doc: AnnotatedDocument, doc_id: str) -> None:
-    """Visualize extraction result.
-
-    Args:
-        annotated_doc: Annotated document
-        doc_id: Document ID (for logging)
-    """
+    """Visualize extraction result."""
     try:
         # Create a temporary file to save the visualization
         with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as tmp:
@@ -493,12 +467,6 @@ def _aggregate_final_results(
     run_id: str,
 ) -> ExtractionResult:
     """Aggregate candidates into final ExtractionResult.
-
-    Args:
-        model: Pydantic model
-        field_candidates: Dictionary of candidates per field
-        schema_version: Schema version string
-        run_id: Run identifier
 
     Returns:
         ExtractionResult
@@ -534,10 +502,6 @@ def run_extraction(
     corpus_docs: list[CorpusDocument],
 ) -> tuple[ExtractionResult, PrePromptInstrumentation]:
     """Run extraction for all fields across all documents.
-
-    Args:
-        model: Extended Pydantic model (all fields as arrays)
-        corpus_docs: List of CorpusDocument instances
 
     Returns:
         Tuple of (complete extraction results, pre-prompt instrumentation)
@@ -720,7 +684,7 @@ def extract_field_candidates(  # noqa: PLR0913
                 ),
                 location=location,
                 snippet=snippet,
-                meta={
+                metadata={
                     "span_start": span_start,
                     "span_end": span_end,
                     **source_map,

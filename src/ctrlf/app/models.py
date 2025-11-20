@@ -28,7 +28,7 @@ class SourceRef(BaseModel):
             char-range "[3521:3630]")
         snippet: Small window of text around the extracted span
             (context for user viewing)
-        meta: Additional metadata (mtime, converter used, checksum, etc.)
+        metadata: Additional metadata (mtime, converter used, checksum, etc.)
     """
 
     doc_id: str = Field(..., min_length=1, description="Document identifier")
@@ -37,7 +37,7 @@ class SourceRef(BaseModel):
     snippet: str = Field(
         ..., min_length=7, description="Context snippet around extracted span"
     )
-    meta: dict[str, object] = Field(
+    metadata: dict[str, object] = Field(
         default_factory=dict, description="Additional metadata"
     )
 

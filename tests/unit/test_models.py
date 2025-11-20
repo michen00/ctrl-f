@@ -24,7 +24,7 @@ class TestSourceRef:
             path="/path/to/file.pdf",
             location="page 3, line 120",
             snippet="This is a context snippet around the extracted value.",
-            meta={"mtime": "2024-01-01T00:00:00Z"},
+            metadata={"mtime": "2024-01-01T00:00:00Z"},
         )
         assert source.doc_id == "doc1"
         assert source.path == "/path/to/file.pdf"

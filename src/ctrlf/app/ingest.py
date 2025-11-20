@@ -39,9 +39,6 @@ class CorpusDocument(NamedTuple):
 def _generate_doc_id(file_path: str) -> str:
     """Generate a stable document ID from file path.
 
-    Args:
-        file_path: Path to the document file
-
     Returns:
         Stable document identifier
     """
@@ -84,9 +81,6 @@ def convert_document_to_markdown(
 
     Uses markitdown to convert any supported file type to markdown.
     Let markitdown handle file type detection and conversion.
-
-    Args:
-        file_path: Path to document file
 
     Returns:
         Tuple of (markdown_content, source_map)
