@@ -292,6 +292,30 @@ class Person(BaseModel):
         assert instance.name == ["John"]  # type: ignore[attr-defined]
         assert instance.tags == ["tag1", "tag2"]  # type: ignore[attr-defined]
 
+    def test_extend_schema_preserves_default_values(self) -> None:
+        """Test that extend_schema preserves custom default values."""
+        code = """
+from pydantic import BaseModel
+
+class Person(BaseModel):
+    name: str = "Unknown"
+    age: int = 0
+    email: str
+"""
+        original_model = import_pydantic_model(code)
+        extended_model = extend_schema(original_model)
+
+        # Extended model should preserve defaults by wrapping in lists
+        instance = extended_model(email=["test@example.com"])
+        assert instance.name == ["Unknown"]  # type: ignore[attr-defined]
+        assert instance.age == [0]  # type: ignore[attr-defined]
+        assert instance.email == ["test@example.com"]  # type: ignore[attr-defined]
+
+        # Should still allow overriding defaults
+        instance2 = extended_model(name=["John"], age=[30], email=["john@example.com"])
+        assert instance2.name == ["John"]  # type: ignore[attr-defined]
+        assert instance2.age == [30]  # type: ignore[attr-defined]
+
     def test_extend_schema_validation(self) -> None:
         """Test that extended schema validates correctly."""
         code = """

@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = "CorpusDocument", "convert_document_to_markdown", "process_corpus"
 
 import hashlib
+import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
@@ -133,7 +134,7 @@ def convert_document_to_markdown(
         return markdown_content, source_map
 
 
-def process_corpus(
+def process_corpus(  # noqa: C901, PLR0912
     corpus_path: str,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[CorpusDocument]:
@@ -177,8 +178,29 @@ def process_corpus(
                         # Extract to temp location
                         zip_ref.extract(member, temp_dir)
                         files_to_process.append(temp_dir / member)
+        elif path.name.endswith(".tar.gz") or path.suffix.lower() == ".tar":
+            # Handle tar and tar.gz archives
+            temp_dir_context = tempfile.TemporaryDirectory(prefix="ctrlf_extract_")
+            temp_dir = Path(temp_dir_context.name)
+            # Determine tar mode based on file extension
+            mode = "r:gz" if path.name.endswith(".tar.gz") else "r"
+            with tarfile.open(path, mode) as tar_ref:  # type: ignore[call-overload]
+                for member in tar_ref.getmembers():
+                    if member.isfile():
+                        member_path = Path(member.name)
+                        if member_path.suffix.lower() in {
+                            ".pdf",
+                            ".docx",
+                            ".html",
+                            ".htm",
+                            ".txt",
+                            ".md",
+                        }:
+                            # Extract to temp location
+                            tar_ref.extract(member, temp_dir)
+                            files_to_process.append(temp_dir / member.name)
         else:
-            # Single file
+            # Single file (not an archive)
             files_to_process.append(path)
     elif path.is_dir():
         # Directory of files (recursive search)

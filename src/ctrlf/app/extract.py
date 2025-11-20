@@ -6,7 +6,7 @@ __all__ = "extract_field_candidates", "run_extraction"
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
 from langextract import extract
 
@@ -156,9 +156,10 @@ def extract_field_candidates(  # noqa: PLR0913
                 },
             )
 
-            # Create candidate
+            # Create candidate (normalization happens later in aggregate_field_results)
             candidate = Candidate(
                 value=value,
+                normalized=None,
                 confidence=float(confidence),
                 sources=[source_ref],
             )
@@ -200,6 +201,56 @@ def _extract_location_from_source_map(
     return f"char-range [{span_start}:{span_end}]"
 
 
+def _extract_inner_type_from_extended_schema(field_type: object) -> type:
+    """Extract the inner primitive type from Extended Schema field type.
+
+    Handles Extended Schema patterns:
+    - list[T] -> T
+    - list[T] | None -> T (filters out None from Union first)
+    - T -> T (fallback for non-list types)
+
+    Args:
+        field_type: Field type annotation from Extended Schema
+
+    Returns:
+        Inner primitive type (str, int, float, bool, etc.)
+    """
+    origin = get_origin(field_type)
+
+    # Handle Union types (Optional) - filter out None first
+    if origin is Union or origin is type(None):
+        args = get_args(field_type)
+        # Filter out None type
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        if not non_none_args:
+            # All args are None, fallback to str
+            return str
+        # Use the first non-None type
+        field_type = non_none_args[0]
+        origin = get_origin(field_type)
+
+    # Handle List types - extract inner type
+    if origin is list:
+        args = get_args(field_type)
+        if args:
+            inner_type = args[0]
+            # If inner type is still a generic (shouldn't happen in Extended Schema)
+            # but handle it gracefully
+            inner_origin = get_origin(inner_type)
+            if inner_origin is Union or inner_origin is type(None):
+                # Handle nested Optional in list (e.g., list[str | None])
+                inner_args = get_args(inner_type)
+                non_none_inner = [arg for arg in inner_args if arg is not type(None)]
+                result_type = non_none_inner[0] if non_none_inner else str
+                return cast("type", result_type)
+            return cast("type", inner_type)
+        # Empty list args, fallback to str
+        return str
+
+    # Not a list or Union - return as-is (should be primitive type)
+    return field_type if isinstance(field_type, type) else str
+
+
 def run_extraction(
     model: type[BaseModel],
     corpus_docs: list[CorpusDocument],
@@ -225,14 +276,11 @@ def run_extraction(
     # Extract candidates for each field from each document
     for doc in corpus_docs:
         for field_name, field_info_obj in field_info.items():
-            # Get field type (should be List[type] in Extended Schema)
+            # Get field type (should be List[type] or Optional[List[type]]
+            # in Extended Schema)
             field_type = field_info_obj.annotation
-            # Extract inner type from List[type]
-            if hasattr(field_type, "__args__"):
-                args = getattr(field_type, "__args__", None)
-                inner_type = args[0] if args else str
-            else:
-                inner_type = str
+            # Extract inner type from Extended Schema pattern
+            inner_type = _extract_inner_type_from_extended_schema(field_type)
 
             field_description = field_info_obj.description
 
@@ -257,7 +305,18 @@ def run_extraction(
 
     field_results: list[FieldResult] = []
     for field_name, candidates in field_candidates.items():
-        field_result = aggregate_field_results(field_name, candidates)
+        # Get field type from model for proper normalization
+        field_info_obj = field_info[field_name]
+        field_type = field_info_obj.annotation
+        # Extract inner type from Extended Schema pattern
+        # (handles both list[T] and list[T] | None)
+        inner_type = _extract_inner_type_from_extended_schema(field_type)
+
+        field_result = aggregate_field_results(
+            field_name,
+            candidates,
+            field_type=inner_type,
+        )
         field_results.append(field_result)
 
     # Create extraction result
