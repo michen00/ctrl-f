@@ -110,7 +110,7 @@ def extract_field_candidates(  # noqa: PLR0913
         # Note: This is a simplified implementation
         # Real langextract API may differ
         extracted = extract(
-            text=markdown_content,
+            text_or_documents=markdown_content,
             field_name=field_name,
             field_type=field_type.__name__
             if hasattr(field_type, "__name__")

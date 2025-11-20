@@ -271,6 +271,8 @@ def _get_directory_path(file_input: str | list[str] | None) -> str | None:
     """Extract directory path from file input.
 
     Handles both string paths and lists of file paths (from directory selection).
+    When a list is provided, finds the common parent directory of all files.
+    Works equally well for selected files or directories.
 
     Args:
         file_input: File path string, list of file paths, or None
@@ -281,12 +283,78 @@ def _get_directory_path(file_input: str | list[str] | None) -> str | None:
     if file_input:
         if isinstance(file_input, str):
             path = Path(file_input)
+            # If it's a file, return its parent directory
+            # If it's a directory, return the directory itself
             return str(path.parent) if path.is_file() else str(path)
-        return str(Path(file_input[0]).parent)
+        # Handle list of file paths - find common parent directory
+        if isinstance(file_input, list):
+            if len(file_input) == 0:
+                return None
+            paths = [Path(f) for f in file_input]
+            # Find common parent by comparing path parts
+            common_parts: tuple[str, ...] | None = None
+            for path in paths:
+                parts = path.parent.parts if path.is_file() else path.parts
+                if common_parts is None:
+                    common_parts = parts
+                else:
+                    # Find the common prefix
+                    common_parts = tuple(
+                        p1
+                        for p1, p2 in zip(common_parts, parts, strict=False)
+                        if p1 == p2
+                    )
+            if common_parts:
+                return str(Path(*common_parts))
+            # Fallback: use parent of first file or the directory itself
+            return str(paths[0].parent if paths[0].is_file() else paths[0])
     return None
 
 
-def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
+def _resolve_and_validate_path(path_input: str | None) -> str:
+    """Resolve and validate a text input path.
+
+    Handles path resolution including:
+    - Tilde expansion (~)
+    - Spaces and special characters
+    - File vs directory detection
+
+    Args:
+        path_input: Text input path string or None
+
+    Returns:
+        Resolved absolute path as string
+
+    Raises:
+        ValueError: If path is empty, doesn't exist, or is invalid
+    """
+    if not path_input or not path_input.strip():
+        msg = "Path cannot be empty"
+        raise ValueError(msg)
+
+    # Strip whitespace
+    path_str = path_input.strip()
+
+    # Expand user home directory (~)
+    path_str = str(Path(path_str).expanduser())
+
+    # Resolve to absolute path (handles relative paths, .., etc.)
+    # This also handles spaces and special characters naturally
+    try:
+        resolved_path = Path(path_str).resolve()
+    except (OSError, RuntimeError) as e:
+        msg = f"Invalid path: {path_str} - {e}"
+        raise ValueError(msg) from e
+
+    # Check if path exists
+    if not resolved_path.exists():
+        msg = f"Path does not exist: {resolved_path}"
+        raise ValueError(msg)
+
+    return str(resolved_path)
+
+
+def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
     """Create Gradio interface for schema and corpus upload.
 
     Returns:
@@ -318,10 +386,13 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                     file_types=[".zip", ".tar", ".tar.gz"],
                     type="filepath",
                 )
-                corpus_dir = gr.File(
-                    label="Or Corpus Directory Path",
-                    file_count="directory",
-                    type="filepath",
+                corpus_dir = gr.Textbox(
+                    label="Or Corpus Directory/File Path",
+                    placeholder=(
+                        "Enter path to directory or file "
+                        "(e.g., ~/Documents/corpus or ./data/file.pdf)"
+                    ),
+                    type="text",
                 )
 
         with gr.Row():
@@ -364,7 +435,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
-            corpus_dir_path: str | list[str] | None,
+            corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
@@ -375,7 +446,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                 schema_file_path: Path to schema file
                 schema_type_str: Type of schema (JSON Schema or Pydantic Model)
                 corpus_file_path: Path to corpus archive
-                corpus_dir_path: Path to corpus directory
+                corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
                 _confidence: Confidence threshold (unused in v0)
                 progress: Gradio progress tracker for progress bars and cancellation
@@ -451,22 +522,21 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                         # Clean up temp directory after processing
                         shutil.rmtree(tmpdir, ignore_errors=True)
                 elif corpus_dir_path:
-                    # Extract directory path from file input
-                    dir_path = _get_directory_path(corpus_dir_path)
-                    if not dir_path:
-                        msg = "Corpus directory path is invalid"
-                        raise ValueError(msg)  # noqa: TRY301
-                    if not Path(dir_path).exists():
-                        msg = f"Corpus directory does not exist: {dir_path}"
-                        raise ValueError(msg)  # noqa: TRY301
+                    # Resolve and validate text input path
+                    # This handles ~ expansion, spaces, special characters, etc.
+                    resolved_path = _resolve_and_validate_path(corpus_dir_path)
 
+                    # process_corpus handles both files and directories:
+                    # - If it's a file, it processes that single file
+                    # - If it's a directory, it recursively processes
+                    #   all supported files
                     corpus_progress_callback = _create_corpus_progress_callback(
                         actual_progress,
                         progress_messages,
                     )
 
                     corpus_docs = process_corpus(
-                        dir_path,
+                        resolved_path,
                         progress_callback=corpus_progress_callback,
                     )
                 else:
@@ -561,7 +631,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
-            corpus_dir_path: str | list[str] | None,
+            corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
@@ -572,7 +642,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                 schema_file_path: Path to schema file
                 schema_type_str: Type of schema (JSON Schema or Pydantic Model)
                 corpus_file_path: Path to corpus archive
-                corpus_dir_path: Path to corpus directory
+                corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
                 _confidence: Confidence threshold (unused in v0)
                 progress: Gradio progress tracker
@@ -1129,13 +1199,8 @@ def create_review_interface(  # noqa: PLR0915, C901
                             pass
 
                     if chosen_value is not None:
-                        # Convert to list format (Extended Schema)
-                        if field_result.field_name not in resolved:
-                            resolved[field_result.field_name] = []
-                        field_values_list = resolved[field_result.field_name]
-                        if isinstance(field_values_list, list):
-                            field_values_list.append(chosen_value)
-
+                        # Add to resolved (as array per Extended Schema)
+                        resolved[field_result.field_name] = [chosen_value]
                         provenance[field_result.field_name] = field_provenance
 
                         resolutions.append(
