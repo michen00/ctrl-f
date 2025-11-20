@@ -241,13 +241,23 @@ def _create_corpus_progress_callback(
 
     def corpus_progress_callback(count: int, total: int) -> None:
         """Update progress during corpus processing."""
-        # Map to start_pct-end_pct range
-        progress_pct = start_pct + (count / total) * (end_pct - start_pct)
-        progress(
-            progress_pct,
-            desc=f"Processing corpus: {count}/{total} documents",
-        )
-        progress_messages.append(f"Processed {count}/{total} documents")
+        # Handle empty corpus (total == 0) to avoid ZeroDivisionError
+        if total == 0:
+            # No documents to process - set progress to end_pct
+            progress_pct = end_pct
+            progress(
+                progress_pct,
+                desc="Processing corpus: 0/0 documents (empty corpus)",
+            )
+            progress_messages.append("Processed 0/0 documents (empty corpus)")
+        else:
+            # Map to start_pct-end_pct range
+            progress_pct = start_pct + (count / total) * (end_pct - start_pct)
+            progress(
+                progress_pct,
+                desc=f"Processing corpus: {count}/{total} documents",
+            )
+            progress_messages.append(f"Processed {count}/{total} documents")
 
         # Check for cancellation
         if progress.cancelled:  # type: ignore[union-attr]
