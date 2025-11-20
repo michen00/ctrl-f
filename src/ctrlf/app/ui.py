@@ -31,6 +31,7 @@ from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import Candidate, PersistedRecord, Resolution, SourceRef
 from ctrlf.app.schema_io import (
     convert_json_schema_to_pydantic,
+    extend_schema,
     import_pydantic_model,
     validate_json_schema,
 )
@@ -496,7 +497,10 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     raise ValueError(msg)  # noqa: TRY301
 
                 # Load schema (type is inferred from file extension)
-                model_class = _load_schema(schema_file_path)
+                raw_model_class = _load_schema(schema_file_path)
+
+                # Extend schema to support multiple values per field
+                model_class = extend_schema(raw_model_class)
 
                 actual_progress(0.2, desc="Schema loaded successfully.")
                 progress_messages.append("Schema loaded successfully.")

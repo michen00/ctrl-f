@@ -4,6 +4,7 @@ from __future__ import annotations
 
 __all__ = ("run_extraction",)
 
+import hashlib
 import json
 import tempfile
 import uuid
@@ -480,7 +481,7 @@ def run_extraction(
 
     # 1. Setup Phase: Generate synthetic examples
     schema_str, example_data, prompt_description = _setup_extraction(model)
-    schema_version = str(hash(schema_str))
+    schema_version = hashlib.md5(schema_str.encode(), usedforsecurity=False).hexdigest()
 
     # Collect all candidates per field
     field_candidates: dict[str, list[Candidate]] = {}
