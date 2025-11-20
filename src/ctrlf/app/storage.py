@@ -84,14 +84,18 @@ def export_record(record_id: str, table_name: str | None = None) -> dict[str, An
         # Search all tables for the record
         storage_path = get_storage_path()
         for db_file in storage_path.glob("*.json"):
-            db = TinyDB(str(db_file))
-            table = db.table("records")
-            record_query = Query()
-            results = table.search(record_query.record_id == record_id)
-            db.close()
+            db: TinyDB | None = None
+            try:
+                db = TinyDB(str(db_file))
+                table = db.table("records")
+                record_query = Query()
+                results = table.search(record_query.record_id == record_id)
 
-            if results:
-                return cast("dict[str, Any]", results[0])
+                if results:
+                    return cast("dict[str, Any]", results[0])
+            finally:
+                if db is not None:
+                    db.close()
 
         msg = f"Record not found: {record_id}"
         raise KeyError(msg)
@@ -104,14 +108,18 @@ def export_record(record_id: str, table_name: str | None = None) -> dict[str, An
         msg = f"Table not found: {table_name}"
         raise KeyError(msg)
 
-    db = TinyDB(str(db_file))
-    table = db.table("records")
-    record_query = Query()
-    results = table.search(record_query.record_id == record_id)
-    db.close()
+    db = None
+    try:
+        db = TinyDB(str(db_file))
+        table = db.table("records")
+        record_query = Query()
+        results = table.search(record_query.record_id == record_id)
 
-    if not results:
-        msg = f"Record not found: {record_id}"
-        raise KeyError(msg)
+        if not results:
+            msg = f"Record not found: {record_id}"
+            raise KeyError(msg)
 
-    return cast("dict[str, Any]", results[0])
+        return cast("dict[str, Any]", results[0])
+    finally:
+        if db is not None:
+            db.close()
