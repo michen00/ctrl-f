@@ -137,24 +137,50 @@ def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False)
     )
 
 
-def _load_schema(
-    schema_file_path: str,
-    schema_type_str: str,
-) -> type[Any]:
-    """Load schema from file and return Pydantic model class.
+def _infer_schema_type(schema_file_path: str) -> str:
+    """Infer schema type from file extension.
 
     Args:
         schema_file_path: Path to schema file
-        schema_type_str: Type of schema (JSON Schema or Pydantic Model)
+
+    Returns:
+        "JSON Schema" for .json files, "Pydantic Model" for .py files
+
+    Raises:
+        ValueError: If file extension is not supported
+    """
+    schema_path = Path(schema_file_path)
+    suffix = schema_path.suffix.lower()
+    if suffix == ".json":
+        return "JSON Schema"
+    if suffix == ".py":
+        return "Pydantic Model"
+    msg = f"Unsupported schema file extension: {suffix}. Expected .json or .py"
+    raise ValueError(msg)
+
+
+def _load_schema(
+    schema_file_path: str,
+) -> type[Any]:
+    """Load schema from file and return Pydantic model class.
+
+    Schema type is automatically inferred from the file extension:
+    - .json files are treated as JSON Schema
+    - .py files are treated as Pydantic models
+
+    Args:
+        schema_file_path: Path to schema file
 
     Returns:
         Pydantic model class
 
     Raises:
-        ValueError: If schema loading fails
+        ValueError: If schema loading fails or file extension is unsupported
     """
     schema_path = Path(schema_file_path)
-    if schema_type_str == "JSON Schema" or schema_path.suffix == ".json":
+    schema_type = _infer_schema_type(schema_file_path)
+
+    if schema_type == "JSON Schema":
         # Load JSON Schema
         with schema_path.open() as f:
             schema_json = f.read()
@@ -374,11 +400,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     file_types=[".json", ".py"],
                     type="filepath",
                 )
-                schema_type = gr.Radio(
-                    choices=["JSON Schema", "Pydantic Model"],
-                    value="JSON Schema",
-                    label="Schema Type",
-                )
 
             with gr.Column():
                 corpus_file = gr.File(
@@ -433,7 +454,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
         def run_extraction_workflow(  # noqa: PLR0915
             schema_file_path: str | None,
-            schema_type_str: str,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
@@ -443,8 +463,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             """Run the extraction workflow.
 
             Args:
-                schema_file_path: Path to schema file
-                schema_type_str: Type of schema (JSON Schema or Pydantic Model)
+                schema_file_path: Path to schema file (type inferred from extension)
                 corpus_file_path: Path to corpus archive
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
@@ -476,8 +495,8 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                     msg = "Schema file is required"
                     raise ValueError(msg)  # noqa: TRY301
 
-                # Load schema
-                model_class = _load_schema(schema_file_path, schema_type_str)
+                # Load schema (type is inferred from file extension)
+                model_class = _load_schema(schema_file_path)
 
                 actual_progress(0.2, desc="Schema loaded successfully.")
                 progress_messages.append("Schema loaded successfully.")
@@ -629,7 +648,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
         def run_extraction_with_progress(
             schema_file_path: str | None,
-            schema_type_str: str,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
@@ -639,8 +657,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             """Wrapper to run extraction workflow and unpack result.
 
             Args:
-                schema_file_path: Path to schema file
-                schema_type_str: Type of schema (JSON Schema or Pydantic Model)
+                schema_file_path: Path to schema file (type inferred from extension)
                 corpus_file_path: Path to corpus archive
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
@@ -652,7 +669,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             """
             result = run_extraction_workflow(
                 schema_file_path,
-                schema_type_str,
                 corpus_file_path,
                 corpus_dir_path,
                 _null_policy_str,
@@ -665,7 +681,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             fn=run_extraction_with_progress,
             inputs=[
                 schema_file,
-                schema_type,
                 corpus_file,
                 corpus_dir,
                 null_policy,
