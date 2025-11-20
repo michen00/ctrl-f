@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ("run_extraction",)
+__all__ = "MIN_SNIPPET_LENGTH", "run_extraction"
 
 import hashlib
 import json
@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+MIN_SNIPPET_LENGTH = 7
+"""Minimum length for extracted snippets (in characters)"""
+
 
 def _create_source_ref(
     doc_id: str,
@@ -57,7 +60,13 @@ def _create_source_ref(
     )
 
 
-def _extract_snippet(markdown: str, start: int, end: int, context: int = 50) -> str:
+def _extract_snippet(
+    markdown: str,
+    start: int,
+    end: int,
+    context: int = 50,
+    min_length: int = MIN_SNIPPET_LENGTH,
+) -> str:
     """Extract a snippet of text around a span.
 
     Args:
@@ -65,24 +74,20 @@ def _extract_snippet(markdown: str, start: int, end: int, context: int = 50) -> 
         start: Start position
         end: End position
         context: Number of characters of context on each side
+        min_length: Minimum length of the snippet (defaults to MIN_SNIPPET_LENGTH)
 
     Returns:
-        Snippet string (guaranteed to be at least 10 characters)
+        Snippet string (guaranteed to be at least min_length characters)
     """
     snippet_start = max(0, start - context)
     snippet_end = min(len(markdown), end + context)
     snippet = markdown[snippet_start:snippet_end]
-    # Ensure snippet is at least 10 characters
-    if len(snippet) < 10:
-        snippet = markdown[max(0, start - 5) : min(len(markdown), end + 5)]
+    # Ensure snippet is at least min_length characters
+    if len(snippet) < min_length:
+        snippet = markdown[max(0, start - context) : min(len(markdown), end + context)]
         # If still too short, use entire document or pad if necessary
-        if len(snippet) < 10:
-            if len(markdown) >= 10:
-                # Use entire document if it's long enough
-                snippet = markdown
-            else:
-                # Pad with spaces to reach minimum length
-                snippet = markdown + " " * (10 - len(markdown))
+        if len(snippet) < min_length:
+            snippet = markdown + " " * (min_length - len(markdown))
     return snippet
 
 
