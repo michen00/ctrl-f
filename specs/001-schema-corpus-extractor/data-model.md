@@ -14,15 +14,15 @@ Represents the exact location where a candidate value was found in a source docu
 - `doc_id: str` - Stable internal identifier for the source document (generated from file path/checksum)
 - `path: str` - Original file path or filename
 - `location: str` - Location descriptor (e.g., "page 3, line 120" or char-range "[3521:3630]")
-- `snippet: str` - Small window of text around the extracted span (context for user viewing)
-- `meta: Dict[str, Any]` - Additional metadata (mtime, converter used, checksum, etc.)
+- `snippet: str` - Small window of text around the extracted span (context for user viewing, minimum 7 characters)
+- `metadata: Dict[str, Any]` - Additional metadata (mtime, converter used, checksum, etc.)
 
 **Validation Rules**:
 
 - `doc_id` must be non-empty
 - `path` must be non-empty
 - `location` must be non-empty (prefer page/line format, char-range as fallback)
-- `snippet` should be 50-200 characters for readability
+- `snippet` must be at least 7 characters
 
 **Relationships**:
 
@@ -112,8 +112,8 @@ User's decision for a single field during review.
 
 - `field_name` must match a field in the schema
 - `chosen_value` must match schema field type
-- If `custom_input` is False, `source_doc_id` and `source_location` should be provided
-- If `custom_input` is True, `source_doc_id` and `source_location` should be None
+- If `custom_input` is True, `source_doc_id` and `source_location` must be None (enforced)
+- If `custom_input` is False, `source_doc_id` and `source_location` may be None (warning only, not enforced)
 
 **Relationships**:
 
@@ -147,6 +147,44 @@ Final saved record after user completes review and resolution.
 - Stored in TinyDB table (keyed by `record_id`)
 - Can be exported to JSON (FR-018)
 
+### PrePromptInteraction
+
+Represents a single pre-prompt interaction before langextract.extract is called.
+
+**Fields**:
+
+- `step_name: str` - Name of the step (e.g., "generate_synthetic_example", "generate_example_extractions")
+- `prompt: str` - The prompt sent to the LLM
+- `completion: str` - The response/completion from the LLM
+- `model: str` - The model used (e.g., "gemini-2.5-flash")
+
+**Validation Rules**:
+
+- `step_name` must be non-empty
+- `prompt` must be non-empty
+- `model` must be non-empty
+
+**Relationships**:
+
+- Contained in `PrePromptInstrumentation.interactions`
+
+### PrePromptInstrumentation
+
+Instrumentation data for pre-prompts before langextract.extract is called.
+
+**Fields**:
+
+- `interactions: List[PrePromptInteraction]` - List of pre-prompt interactions
+
+**Validation Rules**:
+
+- `interactions` can be empty (no pre-prompts executed)
+
+**Relationships**:
+
+- Returned alongside `ExtractionResult` from `run_extraction`
+- Used for debugging and transparency of LLM interactions
+
 ## Schema Extension
 
 ### Extended Schema
@@ -157,7 +195,9 @@ The original user-provided schema (JSON Schema or Pydantic model) with all leaf 
 
 - Primitive field `field_name: str` → `field_name: List[str]`
 - Already array `field_name: List[int]` → `field_name: List[int]` (unchanged)
-- Nested objects/arrays → Rejected in v0 (FR-001)
+- Nested BaseModel objects → Recursively extended (all fields in nested model become arrays)
+- Optional fields `field_name: str | None` → `field_name: List[str] | None`
+- List of BaseModel `field_name: List[Address]` → `field_name: List[ExtendedAddress]` (nested model extended recursively)
 
 **Purpose**:
 
@@ -165,9 +205,10 @@ The original user-provided schema (JSON Schema or Pydantic model) with all leaf 
 - Supports multiple candidates from multiple sources
 - Simplifies validation logic
 
-**Example**:
+**Examples**:
 
 ```python
+# Example 1: Simple schema
 # Original Schema
 class Person(BaseModel):
     name: str
@@ -179,21 +220,41 @@ class ExtendedPerson(BaseModel):
     name: List[str]
     email: List[str]
     age: List[int]
+
+# Example 2: Nested objects (supported)
+# Original Schema
+class Address(BaseModel):
+    street: str
+    city: str
+
+class Person(BaseModel):
+    name: str
+    address: Address
+
+# Extended Schema
+class ExtendedAddress(BaseModel):
+    street: List[str]
+    city: List[str]
+
+class ExtendedPerson(BaseModel):
+    name: List[str]
+    address: List[ExtendedAddress]
 ```
 
 ## Data Flow
 
 1. **Ingestion**: Corpus files → Markdown conversion → SourceRef creation
-2. **Extraction**: Markdown + Schema → Candidate generation → SourceRef attachment
-3. **Aggregation**: Candidates → Deduplication → Normalization → Consensus detection → FieldResult
-4. **Review**: FieldResult → User selection → Resolution
-5. **Persistence**: Resolutions → Validation → PersistedRecord → TinyDB
+2. **Extraction Setup**: Schema → Synthetic example generation → Example extraction generation → PrePromptInstrumentation
+3. **Extraction**: Markdown + Schema + Examples → Candidate generation → SourceRef attachment
+4. **Aggregation**: Candidates → Deduplication → Normalization → Consensus detection → FieldResult
+5. **Review**: FieldResult → User selection → Resolution
+6. **Persistence**: Resolutions → Validation → PersistedRecord → TinyDB
 
 ## Validation Points
 
 1. **Schema Input**: Validate JSON Schema format or Pydantic model syntax
-2. **Schema Extension**: Verify flat schema (no nesting), coerce to arrays
+2. **Schema Extension**: Recursively extend all fields (including nested BaseModel types) to arrays
 3. **Candidate Creation**: Ensure all candidates have non-empty sources
-4. **FieldResult**: Verify consensus candidate meets thresholds
-5. **Resolution**: Validate chosen values against Extended Schema
-6. **PersistedRecord**: Final validation before storage
+4. **FieldResult**: Verify consensus candidate meets thresholds and is one of the candidates
+5. **Resolution**: Validate chosen values against Extended Schema; ensure source fields are None when custom_input is True
+6. **PersistedRecord**: Final validation before storage; validate audit timestamp format
