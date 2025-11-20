@@ -94,7 +94,7 @@ develop: build/install-dev ## Install the project for development (WITH_HOOKS={t
 
 .PHONY: test
 PARALLEL ?= true
-test: build/install-test ## Run all tests with coverage (PARALLEL={true|false}, default=false)
+test: build/install-test ## Run all tests with coverage (PARALLEL={true|false}, default=true)
 	@PYTEST_CMD="$(PYTEST)"; [ "$(PARALLEL)" = "true" ] && PYTEST_CMD="$$PYTEST_CMD -n auto"; \
     $(UV) run $$PYTEST_CMD --cov=src --cov-report=term-missing
 
