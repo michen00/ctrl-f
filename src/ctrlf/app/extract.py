@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
 from google import genai
-from google.genai import types  # noqa: F401
 from langextract import extract, visualize
 from langextract import io as lx_io
 from langextract.data import AnnotatedDocument, ExampleData, Extraction
