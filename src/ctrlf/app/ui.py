@@ -1194,12 +1194,21 @@ def create_review_interface(  # noqa: PLR0915, C901
                                     ):
                                         chosen_value = False
                                     else:
-                                        # Invalid boolean value, use as string
-                                        chosen_value = custom_value_stripped
+                                        msg = (
+                                            f"Invalid boolean value for field "
+                                            f"'{field_result.field_name}': "
+                                            f"{custom_value_stripped}"
+                                        )
+                                        raise ValueError(msg)  # noqa: TRY301
                                 else:
+                                    # String or other types - use as-is
                                     chosen_value = custom_value_stripped
-                            except (ValueError, TypeError):
-                                chosen_value = custom_value_stripped
+                            except (ValueError, TypeError) as e:
+                                msg = (
+                                    f"Invalid value type for field "
+                                    f"'{field_result.field_name}': {e}"
+                                )
+                                raise ValueError(msg) from e
                         else:
                             chosen_value = custom_value_stripped
                         custom_input = True
