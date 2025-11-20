@@ -17,7 +17,7 @@ import zipfile
 from datetime import UTC, datetime
 from inspect import cleandoc
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import gradio as gr
 from slugify import slugify
@@ -310,6 +310,37 @@ def _get_directory_path(file_input: str | list[str] | None) -> str | None:
     return None
 
 
+def _resolve_schema_file_path(
+    schema_file_path: str | None,
+    schema_dir_path: str | None,
+) -> str:
+    """Resolve schema file path from file upload or text input.
+
+    Args:
+        schema_file_path: Path from file upload component
+        schema_dir_path: Path from text input component
+
+    Returns:
+        Resolved schema file path
+
+    Raises:
+        ValueError: If no schema input is provided or path is invalid
+    """
+    if schema_file_path:
+        return schema_file_path
+    if schema_dir_path:
+        resolved_path = _resolve_and_validate_path(schema_dir_path)
+        # Ensure it's a file, not a directory
+        path = Path(resolved_path)
+        if not path.is_file():
+            msg = f"Schema path must be a file, not a directory: {resolved_path}"
+            raise ValueError(msg)
+        return resolved_path
+
+    msg = "Schema file or path is required"
+    raise ValueError(msg)
+
+
 def _load_and_extend_schema(
     schema_file_path: str,
     actual_progress: gr.Progress | NoOpProgress,
@@ -599,6 +630,14 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                     file_types=[".json", ".py"],
                     type="filepath",
                 )
+                schema_dir = gr.Textbox(
+                    label="Or Schema File Path",
+                    placeholder=(
+                        "Enter path to schema file "
+                        "(e.g., ~/Documents/schema.json or ./schemas/model.py)"
+                    ),
+                    type="text",
+                )
 
             with gr.Column():
                 corpus_file = gr.File(
@@ -650,13 +689,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 label="Pre-Prompt Interactions",
             )
 
-        def _raise_schema_required_error() -> None:
-            """Raise ValueError for missing schema file."""
-            msg = "Schema file is required"
-            raise ValueError(msg)
-
         def run_extraction_workflow(
             schema_file_path: str | None,
+            schema_dir_path: str | None,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
@@ -666,7 +701,8 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             """Run the extraction workflow.
 
             Args:
-                schema_file_path: Path to schema file (type inferred from extension)
+                schema_file_path: Path to schema file from file upload
+                schema_dir_path: Text input path to schema file
                 corpus_file_path: Path to corpus archive
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
@@ -686,12 +722,11 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
 
             try:
                 # Step 1: Load schema (0-20%)
-                if not schema_file_path:
-                    _raise_schema_required_error()
-                # Type narrowing: schema_file_path is guaranteed to be str here
-                # after the None check above
+                resolved_schema_path = _resolve_schema_file_path(
+                    schema_file_path, schema_dir_path
+                )
                 model_class = _load_and_extend_schema(
-                    cast("str", schema_file_path), actual_progress, progress_messages
+                    resolved_schema_path, actual_progress, progress_messages
                 )
 
                 # Step 2: Process corpus (20-60%)
@@ -859,6 +894,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
 
         def run_extraction_with_progress(
             schema_file_path: str | None,
+            schema_dir_path: str | None,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
@@ -868,7 +904,8 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             """Wrapper to run extraction workflow and unpack result.
 
             Args:
-                schema_file_path: Path to schema file (type inferred from extension)
+                schema_file_path: Path to schema file from file upload
+                schema_dir_path: Text input path to schema file
                 corpus_file_path: Path to corpus archive
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
@@ -881,6 +918,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             """
             result, instrumentation = run_extraction_workflow(
                 schema_file_path,
+                schema_dir_path,
                 corpus_file_path,
                 corpus_dir_path,
                 _null_policy_str,
@@ -893,6 +931,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             fn=run_extraction_with_progress,
             inputs=[
                 schema_file,
+                schema_dir,
                 corpus_file,
                 corpus_dir,
                 null_policy,
