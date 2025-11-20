@@ -190,16 +190,46 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
     """Extract archive file to destination directory.
 
     Raises:
-        ValueError: If archive format is unsupported
+        ValueError: If archive format is unsupported or archive contains unsafe paths
     """
+    def _is_within_directory(base: Path, target: Path) -> bool:
+        try:
+            base = base.resolve(strict=False)
+            target = target.resolve(strict=False)
+            return str(target).startswith(str(base))
+        except Exception:
+            return False
+
     archive_lower = archive_path.lower()
+    extract_to_path = Path(extract_to).resolve(strict=False)
     if archive_lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
-            zip_ref.extractall(extract_to)  # noqa: S202
+            for member in zip_ref.infolist():
+                member_path = Path(member.filename)
+                dest_path = (extract_to_path / member_path).resolve(strict=False)
+                if not _is_within_directory(extract_to_path, dest_path):
+                    raise ValueError(f"Unsafe path detected in zip archive: {member.filename}")
+                if member.is_dir():
+                    dest_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zip_ref.open(member, "r") as source, open(dest_path, "wb") as target:
+                        shutil.copyfileobj(source, target)
     elif archive_lower.endswith((".tar", ".tar.gz")):
         mode = "r:gz" if archive_lower.endswith(".tar.gz") else "r"
         with tarfile.open(archive_path, mode) as tar_ref:  # type: ignore[call-overload]
-            tar_ref.extractall(extract_to)  # noqa: S202
+            for member in tar_ref.getmembers():
+                member_path = Path(member.name)
+                dest_path = (extract_to_path / member_path).resolve(strict=False)
+                if not _is_within_directory(extract_to_path, dest_path):
+                    raise ValueError(f"Unsafe path detected in tar archive: {member.name}")
+                if member.isdir():
+                    dest_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    with tar_ref.extractfile(member) as source, open(dest_path, "wb") as target:
+                        if source is not None:
+                            shutil.copyfileobj(source, target)
     else:
         msg = f"Unsupported archive format: {archive_path}"
         raise ValueError(msg)
