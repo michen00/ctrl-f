@@ -7,6 +7,8 @@ __all__ = (
     "ExtractionResult",
     "FieldResult",
     "PersistedRecord",
+    "PrePromptInstrumentation",
+    "PrePromptInteraction",
     "Resolution",
     "SourceRef",
 )
@@ -190,3 +192,32 @@ class PersistedRecord(BaseModel):
                 msg = f"Invalid ISO 8601 timestamp in audit: {timestamp}"
                 raise ValueError(msg) from e
         return v
+
+
+class PrePromptInteraction(BaseModel):
+    """Represents a single pre-prompt interaction before langextract.extract is called.
+
+    Attributes:
+        step_name: Name of the step (e.g., "generate_synthetic_example",
+            "generate_example_extractions")
+        prompt: The prompt sent to the LLM
+        completion: The response/completion from the LLM
+        model: The model used (e.g., "gemini-2.5-flash")
+    """
+
+    step_name: str = Field(..., min_length=1, description="Name of the pre-prompt step")
+    prompt: str = Field(..., min_length=1, description="Prompt sent to LLM")
+    completion: str = Field(..., description="LLM response/completion")
+    model: str = Field(..., min_length=1, description="Model used for this interaction")
+
+
+class PrePromptInstrumentation(BaseModel):
+    """Instrumentation data for pre-prompts before langextract.extract is called.
+
+    Attributes:
+        interactions: List of pre-prompt interactions
+    """
+
+    interactions: list[PrePromptInteraction] = Field(
+        default_factory=list, description="List of pre-prompt interactions"
+    )

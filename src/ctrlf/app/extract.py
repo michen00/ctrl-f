@@ -19,7 +19,14 @@ from langextract import io as lx_io
 from langextract.data import AnnotatedDocument, ExampleData, Extraction
 
 from ctrlf.app.logging_conf import get_logger
-from ctrlf.app.models import Candidate, ExtractionResult, FieldResult, SourceRef
+from ctrlf.app.models import (
+    Candidate,
+    ExtractionResult,
+    FieldResult,
+    PrePromptInstrumentation,
+    PrePromptInteraction,
+    SourceRef,
+)
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -111,16 +118,17 @@ def _extract_location_from_source_map(
     return f"char-range [{span_start}:{span_end}]"
 
 
-def generate_synthetic_example(schema: str) -> str:
+def generate_synthetic_example(schema: str) -> tuple[str, PrePromptInteraction]:
     """Generate synthetic example text based on the schema using Google Gen AI.
 
     Args:
         schema: The schema definition (JSON Schema or Pydantic model)
 
     Returns:
-        Generated example text
+        Tuple of (generated example text, instrumentation data)
     """
     client = genai.Client()
+    model_name = "gemini-2.5-flash"
 
     prompt = f"""
 fabricate brief example text from which structured data may be extracted by this schema:
@@ -133,14 +141,25 @@ Example text:
 """
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=model_name,
         contents=prompt,
     )
 
-    return response.text if response.text else ""
+    completion_text = response.text if response.text else ""
+
+    instrumentation = PrePromptInteraction(
+        step_name="generate_synthetic_example",
+        prompt=prompt,
+        completion=completion_text,
+        model=model_name,
+    )
+
+    return completion_text, instrumentation
 
 
-def generate_example_extractions(schema: str, example_text: str) -> list[Extraction]:
+def generate_example_extractions(
+    schema: str, example_text: str
+) -> tuple[list[Extraction], PrePromptInteraction]:
     """Generate example extractions using Google Gen AI.
 
     Args:
@@ -148,9 +167,10 @@ def generate_example_extractions(schema: str, example_text: str) -> list[Extract
         example_text: The synthetic example text
 
     Returns:
-        List of langextract Extraction objects
+        Tuple of (list of langextract Extraction objects, instrumentation data)
     """
     client = genai.Client()
+    model_name = "gemini-2.5-flash"
 
     prompt = f"""
 Extract structured data from the input text according to the schema.
@@ -182,13 +202,13 @@ Output:
 """  # noqa: E501
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=model_name,
         contents=prompt,
     )
 
     # Parse the output
     extractions: list[Extraction] = []
-    response_text = response.text
+    response_text = response.text or ""
     if response_text:
         text_to_parse = response_text.strip()
 
@@ -253,7 +273,14 @@ Output:
                         e,
                     )
 
-    return extractions
+    instrumentation = PrePromptInteraction(
+        step_name="generate_example_extractions",
+        prompt=prompt,
+        completion=response_text,
+        model=model_name,
+    )
+
+    return extractions, instrumentation
 
 
 def _extract_inner_type_from_extended_schema(field_type: object) -> type:
@@ -308,21 +335,23 @@ def _extract_inner_type_from_extended_schema(field_type: object) -> type:
 
 def _setup_extraction(
     model: type[BaseModel],
-) -> tuple[str, ExampleData, str]:
+) -> tuple[str, ExampleData, str, PrePromptInstrumentation]:
     """Setup extraction by generating synthetic examples and prompt description.
 
     Args:
         model: Extended Pydantic model
 
     Returns:
-        Tuple of (schema_str, example_data, prompt_description)
+        Tuple of (schema_str, example_data, prompt_description, instrumentation)
     """
     # Use json_schema string as schema representation for stability
     schema_str = json.dumps(model.model_json_schema(), indent=2)
 
     try:
-        example_text = generate_synthetic_example(schema_str)
-        example_extractions = generate_example_extractions(schema_str, example_text)
+        example_text, interaction1 = generate_synthetic_example(schema_str)
+        example_extractions, interaction2 = generate_example_extractions(
+            schema_str, example_text
+        )
 
         example_data = ExampleData(text=example_text, extractions=example_extractions)
 
@@ -331,11 +360,15 @@ def _setup_extraction(
             f"Extract structured data based on the following schema: {schema_str}"
         )
 
+        instrumentation = PrePromptInstrumentation(
+            interactions=[interaction1, interaction2]
+        )
+
     except Exception:
         logger.exception("Failed to generate synthetic examples")
         raise
 
-    return schema_str, example_data, prompt_description
+    return schema_str, example_data, prompt_description, instrumentation
 
 
 def _process_document(
@@ -499,7 +532,7 @@ def _aggregate_final_results(
 def run_extraction(
     model: type[BaseModel],
     corpus_docs: list[CorpusDocument],
-) -> ExtractionResult:
+) -> tuple[ExtractionResult, PrePromptInstrumentation]:
     """Run extraction for all fields across all documents.
 
     Args:
@@ -507,12 +540,14 @@ def run_extraction(
         corpus_docs: List of CorpusDocument instances
 
     Returns:
-        Complete extraction results with all field results
+        Tuple of (complete extraction results, pre-prompt instrumentation)
     """
     run_id = str(uuid.uuid4())
 
     # 1. Setup Phase: Generate synthetic examples
-    schema_str, example_data, prompt_description = _setup_extraction(model)
+    schema_str, example_data, prompt_description, instrumentation = _setup_extraction(
+        model
+    )
     schema_version = hashlib.md5(schema_str.encode(), usedforsecurity=False).hexdigest()
 
     # Collect all candidates per field
@@ -527,7 +562,10 @@ def run_extraction(
             field_candidates[field_name].append(candidate)
 
     # 3. Aggregation Phase
-    return _aggregate_final_results(model, field_candidates, schema_version, run_id)
+    extraction_result = _aggregate_final_results(
+        model, field_candidates, schema_version, run_id
+    )
+    return extraction_result, instrumentation
 
 
 def _create_examples_for_field(

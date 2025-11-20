@@ -13,7 +13,12 @@ from ctrlf.app.extract import (
     run_extraction,
 )
 from ctrlf.app.ingest import CorpusDocument
-from ctrlf.app.models import Candidate, ExtractionResult, SourceRef
+from ctrlf.app.models import (
+    Candidate,
+    ExtractionResult,
+    PrePromptInteraction,
+    SourceRef,
+)
 
 
 class TestExtractFieldCandidates:
@@ -173,9 +178,24 @@ class TestRunExtraction:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test that extraction creates FieldResult for each schema field."""
-        # Mock setup
-        mock_gen_example.return_value = "Example text"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example text",
+            PrePromptInteraction(
+                step_name="test",
+                prompt="test",
+                completion="test",
+                model="test",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="test",
+                prompt="test",
+                completion="test",
+                model="test",
+            ),
+        )
 
         # Mock extraction results
         # We need to return a document with extractions for both fields
@@ -210,7 +230,7 @@ class TestRunExtraction:
             ),
         ]
 
-        result = run_extraction(TestModel, corpus_docs)
+        result, _instrumentation = run_extraction(TestModel, corpus_docs)
 
         assert isinstance(result, ExtractionResult)
         assert len(result.results) == 2  # One per field
@@ -230,9 +250,24 @@ class TestRunExtraction:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test that extraction continues on individual field/document errors."""
-        # Mock setup
-        mock_gen_example.return_value = "Example text"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example text",
+            PrePromptInteraction(
+                step_name="test",
+                prompt="test",
+                completion="test",
+                model="test",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="test",
+                prompt="test",
+                completion="test",
+                model="test",
+            ),
+        )
 
         # Mock extraction to fail for first doc, succeed for second (empty)
         mock_doc_success = AnnotatedDocument(text="", extractions=[])
@@ -256,7 +291,7 @@ class TestRunExtraction:
         ]
 
         # Should not raise, should continue processing
-        result = run_extraction(TestModel, corpus_docs)
+        result, _instrumentation = run_extraction(TestModel, corpus_docs)
         assert isinstance(result, ExtractionResult)
         assert len(result.results) == 2  # Results for fields exist even if empty
 

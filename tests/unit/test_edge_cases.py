@@ -14,7 +14,13 @@ from pydantic import BaseModel
 from ctrlf.app.aggregate import aggregate_field_results
 from ctrlf.app.extract import extract_field_candidates, run_extraction
 from ctrlf.app.ingest import CorpusDocument, convert_document_to_markdown
-from ctrlf.app.models import Candidate, PersistedRecord, Resolution, SourceRef
+from ctrlf.app.models import (
+    Candidate,
+    PersistedRecord,
+    PrePromptInteraction,
+    Resolution,
+    SourceRef,
+)
 
 
 class TestMultipleOccurrencesPerDocument:
@@ -384,9 +390,24 @@ class TestSC003RecallMetrics:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test that recall can be calculated for extraction results."""
-        # Mock setup
-        mock_gen_example.return_value = "Example"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example",
+            PrePromptInteraction(
+                step_name="generate_synthetic_example",
+                prompt="test prompt",
+                completion="Example",
+                model="gemini-2.5-flash",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="generate_example_extractions",
+                prompt="test prompt",
+                completion="[]",
+                model="gemini-2.5-flash",
+            ),
+        )
 
         # Mock return values with side effect to simulate different docs
         def recall_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
@@ -460,7 +481,7 @@ class TestSC003RecallMetrics:
             ),
         ]
 
-        result = run_extraction(TestModel, corpus_docs)
+        result, _instrumentation = run_extraction(TestModel, corpus_docs)
 
         # Calculate recall: fields with at least one candidate / total fields
         fields_with_candidates = sum(
@@ -489,9 +510,24 @@ class TestSC003RecallMetrics:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test recall when fields are partially present across documents."""
-        # Mock setup
-        mock_gen_example.return_value = "Example"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example",
+            PrePromptInteraction(
+                step_name="generate_synthetic_example",
+                prompt="test prompt",
+                completion="Example",
+                model="gemini-2.5-flash",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="generate_example_extractions",
+                prompt="test prompt",
+                completion="[]",
+                model="gemini-2.5-flash",
+            ),
+        )
 
         def partial_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
             text = kwargs.get("text_or_documents", "")
@@ -549,7 +585,7 @@ class TestSC003RecallMetrics:
             ),
         ]
 
-        result = run_extraction(TestModel, corpus_docs)
+        result, _instrumentation = run_extraction(TestModel, corpus_docs)
 
         # All 5 fields should have candidates across the 3 documents
         fields_with_candidates = sum(
