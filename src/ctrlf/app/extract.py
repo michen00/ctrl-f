@@ -154,36 +154,13 @@ def generate_example_extractions(schema: str, example_text: str) -> list[Extract
 
     prompt = f"""
 Use the schema and example text to create Extractions.
+Output MUST be a list of JSON objects, one per line, with "class" and "text" fields.
+Do NOT output a single large JSON object.
+Do NOT wrap in markdown code blocks.
 
-<example_input_text>
-Residential Lease Agreement (Effective 2024-03-01, California)
-
-Landlord: Acme Property Rentals, Inc. (Agent: Jane Doe, Phone 555-123-4567)
-Tenant: John Smith (DOB 1985-05-20, Email jsmith@example.com)
-
-Property: Single-family house at 123 Maple Street, Apt B, Sunnyvale, CA 94087.
-Includes parking and community garden access. Excludes locked backyard shed.
-Semi-furnished.
-
-Lease Term: 2024-03-01 to 2025-02-28 (12 months).
-Tenant must give 60-days notice for termination or renewal.
-
-Rent: $2,500.00 per month, due on the 1st. Security deposit: $5,000.00,
-refundable minus damages. Late fee: $50 after the 5th.
-
-Use: Residential only, max 4 occupants. Pets allowed (small pets; $25/month).
-No subletting without written consent.
-
-Utilities: Tenant pays electricity and gas.
-Landlord pays water and maintains roof and exterior.
-</example_input_text>
-
-Output:
-{{"class": "base_rent_amount", "text": "$2,500.00"}}
-{{"class": "term_start_date", "text": "2024-03-01"}}
-{{"class": "furnishing_status", "text": "semi-furnished"}}
-{{"class": "landlord_contact_phone", "text": "555-123-4567"}}
-{{"class": "utility_responsibility", "text": "electricity"}}
+Example Output Format:
+{{"class": "field_name", "text": "extracted value"}}
+{{"class": "another_field", "text": "another value"}}
 
 <input_text>
 {example_text}
@@ -199,27 +176,72 @@ Output:
         contents=prompt,
     )
 
-    # Parse the output (assuming line-delimited JSON as per prompt example)
-    extractions = []
+    # Parse the output
+    extractions: list[Extraction] = []
     response_text = response.text
     if response_text:
-        for line in response_text.strip().split("\n"):
-            if not line.strip():
+        text_to_parse = response_text.strip()
+
+        # Try to parse as a single JSON object/array first (handling multi-line JSON)
+        try:
+            # Strip markdown code fences if present
+            if text_to_parse.startswith("```"):
+                lines = text_to_parse.splitlines()
+                # Remove first line (```json or ```)
+                if len(lines) > 1:
+                    lines = lines[1:]
+                # Remove last line if it is just ```
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text_to_parse = "\n".join(lines)
+
+            parsed_data = json.loads(text_to_parse)
+
+            # If it's a list, assume it's a list of extraction objects
+            if isinstance(parsed_data, list):
+                extractions.extend(
+                    Extraction(
+                        extraction_class=item["class"],
+                        extraction_text=str(item["text"]),
+                    )
+                    for item in parsed_data
+                    if isinstance(item, dict) and "class" in item and "text" in item
+                )
+            # If it's a dict, flatten it to extractions
+            elif isinstance(parsed_data, dict):
+                # For now, we skip complex JSON dict parsing as we enforce flat output
+                # via prompt. This block catches valid JSON that isn't a flat list.
+                pass
+
+        except json.JSONDecodeError:
+            # Not a single valid JSON object, likely line-delimited
+            pass
+
+        # Fallback to line-delimited processing (robust)
+        for line_raw in response_text.strip().split("\n"):
+            line = line_raw.strip()
+            if not line:
+                continue
+            if line.startswith("```"):
                 continue
             try:
-                # Basic JSON parsing logic would go here, adapting to how Gemini
-                # returns it.
                 data = json.loads(line)
-                extractions.append(
-                    Extraction(
-                        extraction_class=data["class"],
-                        extraction_text=data["text"],
+                # Only accept if it matches our expected format
+                if isinstance(data, dict) and "class" in data and "text" in data:
+                    extractions.append(
+                        Extraction(
+                            extraction_class=data["class"],
+                            extraction_text=str(data["text"]),
+                        )
                     )
-                )
             except Exception as e:  # noqa: BLE001
-                logger.warning(
-                    "Failed to parse example extraction line: %s. Error: %s", line, e
-                )
+                # Only log if it looks like JSON but failed, or if we are debugging
+                if line.startswith("{"):
+                    logger.warning(
+                        "Failed to parse example extraction line: %s. Error: %s",
+                        line,
+                        e,
+                    )
 
     return extractions
 
