@@ -12,7 +12,7 @@ from langextract.data import AnnotatedDocument, Extraction
 from pydantic import BaseModel
 
 from ctrlf.app.aggregate import aggregate_field_results
-from ctrlf.app.extract import extract_field_candidates, run_extraction
+from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import CorpusDocument, convert_document_to_markdown
 from ctrlf.app.models import (
     Candidate,
@@ -25,66 +25,6 @@ from ctrlf.app.models import (
 
 class TestMultipleOccurrencesPerDocument:
     """Test handling of multiple occurrences of the same value in a document."""
-
-    @patch("ctrlf.app.extract.extract")
-    def test_multiple_occurrences_create_separate_candidates(
-        self, mock_extract: MagicMock
-    ) -> None:
-        """Test multiple occurrences create separate candidates with different locations."""  # noqa: E501
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "email"
-        e1.extraction_text = "john@example.com"
-        e1.char_start = 9
-        e1.char_end = 25
-
-        e2 = MagicMock(spec=Extraction)
-        e2.extraction_class = "email"
-        e2.extraction_text = "john@example.com"
-        e2.char_start = 30
-        e2.char_end = 46
-
-        e3 = MagicMock(spec=Extraction)
-        e3.extraction_class = "email"
-        e3.extraction_text = "john@example.com"
-        e3.char_start = 52
-        e3.char_end = 68
-
-        mock_doc = AnnotatedDocument(
-            text="Contact: john@example.com... john@example.com... john@example.com",
-            extractions=[e1, e2, e3],
-        )
-        mock_extract.return_value = mock_doc
-
-        markdown = (
-            "Contact: john@example.com for inquiries. "
-            "Also reach out to john@example.com for support. "
-            "Email john@example.com for more info."
-        )
-        source_map: dict[str, object] = {
-            "file_path": "test.txt",
-            "file_name": "test.txt",
-        }
-        doc_id = "test_doc_1"
-
-        candidates = extract_field_candidates(
-            field_name="email",
-            field_type=str,
-            field_description="Email address",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # Should create separate candidates for each occurrence
-        # (exact count depends on langextract, but should handle multiple)
-        assert isinstance(candidates, list)
-        assert len(candidates) == 3
-        # Each candidate should have unique location information
-        if len(candidates) > 1:
-            locations = [c.sources[0].location for c in candidates]
-            # Locations should be different (or at least have different spans)
-            assert len(set(locations)) >= 1  # At minimum, should have locations
 
     def test_multiple_occurrences_deduplicated_correctly(self) -> None:
         """Test that multiple occurrences are properly deduplicated."""
@@ -128,48 +68,6 @@ class TestMultipleOccurrencesPerDocument:
 class TestMissingLocationFallback:
     """Test fallback behavior when location information is missing."""
 
-    @patch("ctrlf.app.extract.extract")
-    def test_missing_location_fallback_to_char_range(
-        self, mock_extract: MagicMock
-    ) -> None:
-        """Test that missing location falls back to char-range format."""
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "email"
-        e1.extraction_text = "test@example.com"
-        e1.char_start = 7
-        e1.char_end = 23
-
-        mock_doc = AnnotatedDocument(
-            text="Email: test@example.com",
-            extractions=[e1],
-        )
-        mock_extract.return_value = mock_doc
-
-        source_map: dict[str, object] = {
-            "file_path": "test.txt",
-            "file_name": "test.txt",
-            # No pages or lines information
-        }
-        markdown = "Email: test@example.com"
-        doc_id = "test_doc_1"
-
-        candidates = extract_field_candidates(
-            field_name="email",
-            field_type=str,
-            field_description="Email address",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # All candidates should have location information
-        for candidate in candidates:
-            for source in candidate.sources:
-                assert source.location
-                # Should fallback to char-range if no page/line info
-                assert "char-range" in source.location or "page" in source.location
-
     def test_source_ref_with_minimal_location_info(self) -> None:
         """Test SourceRef creation with minimal location information."""
         # Should accept char-range as valid location
@@ -185,87 +83,6 @@ class TestMissingLocationFallback:
 
 class TestSpecialCharactersAndEncoding:
     """Test handling of special characters, encoding, and edge cases."""
-
-    @patch("ctrlf.app.extract.extract")
-    def test_special_characters_in_content(self, mock_extract: MagicMock) -> None:
-        """Test extraction with special characters in content."""
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "email"
-        e1.extraction_text = "test+tag@example.com"
-        e1.char_start = 7
-        e1.char_end = 27
-
-        mock_doc = AnnotatedDocument(
-            text="Email: test+tag@example.com",
-            extractions=[e1],
-        )
-        mock_extract.return_value = mock_doc
-
-        # Test with various special characters
-        markdown = (
-            "Name: José García\n"
-            "Email: test+tag@example.com\n"
-            "Phone: +1 (555) 123-4567\n"
-            "Address: 123 Main St., Apt. #4B\n"
-            "Note: Price: $99.99 & tax"
-        )
-        source_map: dict[str, object] = {"file_path": "test.txt"}
-        doc_id = "test_doc_1"
-
-        # Test email extraction with special characters
-        candidates = extract_field_candidates(
-            field_name="email",
-            field_type=str,
-            field_description="Email address",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # Should handle special characters in email addresses
-        assert isinstance(candidates, list)
-        for candidate in candidates:
-            assert isinstance(candidate.value, str)
-            assert candidate.value == "test+tag@example.com"
-
-    @patch("ctrlf.app.extract.extract")
-    def test_unicode_characters(self, mock_extract: MagicMock) -> None:
-        """Test handling of Unicode characters."""
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "name"
-        e1.extraction_text = "山田太郎"
-        e1.char_start = 6
-        e1.char_end = 10
-
-        mock_doc = AnnotatedDocument(
-            text="Name: 山田太郎 (Yamada Taro)",
-            extractions=[e1],
-        )
-        mock_extract.return_value = mock_doc
-
-        markdown = (
-            "Name: 山田太郎 (Yamada Taro)\n"
-            "Email: test@example.com\n"
-            "Company: 株式会社テスト"
-        )
-        source_map: dict[str, object] = {"file_path": "test.txt"}
-        doc_id = "test_doc_1"
-
-        candidates = extract_field_candidates(
-            field_name="name",
-            field_type=str,
-            field_description="Person name",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # Should handle Unicode characters
-        assert isinstance(candidates, list)
-        assert len(candidates) > 0
-        assert candidates[0].value == "山田太郎"
 
     def test_encoding_handling_in_document_conversion(self) -> None:
         """Test that document conversion handles different encodings."""
@@ -288,93 +105,9 @@ class TestSpecialCharactersAndEncoding:
 class TestImagesAndTables:
     """Test handling of images and tables in documents."""
 
-    @patch("ctrlf.app.extract.extract")
-    def test_extraction_with_table_content(self, mock_extract: MagicMock) -> None:
-        """Test extraction when content is in table format."""
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "email"
-        e1.extraction_text = "alice@example.com"
-        e1.char_start = 10
-        e1.char_end = 27
-
-        e2 = MagicMock(spec=Extraction)
-        e2.extraction_class = "email"
-        e2.extraction_text = "bob@example.com"
-        e2.char_start = 30
-        e2.char_end = 45
-
-        mock_doc = AnnotatedDocument(
-            text="| Alice | alice@example.com |",
-            extractions=[e1, e2],
-        )
-        mock_extract.return_value = mock_doc
-
-        # Markdown table format
-        markdown = (
-            "| Name | Email |\n"
-            "|------|-------|\n"
-            "| Alice | alice@example.com |\n"
-            "| Bob | bob@example.com |"
-        )
-        source_map: dict[str, object] = {"file_path": "test.txt"}
-        doc_id = "test_doc_1"
-
-        candidates = extract_field_candidates(
-            field_name="email",
-            field_type=str,
-            field_description="Email address",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # Should extract from table content
-        assert isinstance(candidates, list)
-        assert len(candidates) >= 1
-
-    @patch("ctrlf.app.extract.extract")
-    def test_extraction_with_image_alt_text(self, mock_extract: MagicMock) -> None:
-        """Test extraction when content might be in image alt text."""
-        # Mock extract return value
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "email"
-        e1.extraction_text = "john@example.com"
-        e1.char_start = 23
-        e1.char_end = 39
-
-        e2 = MagicMock(spec=Extraction)
-        e2.extraction_class = "email"
-        e2.extraction_text = "test@example.com"
-        e2.char_start = 50
-        e2.char_end = 66
-
-        mock_doc = AnnotatedDocument(
-            text="![Contact information: john@example.com](contact.png)",
-            extractions=[e1, e2],
-        )
-        mock_extract.return_value = mock_doc
-
-        # Markdown with image (alt text might contain extractable info)
-        markdown = (
-            "![Contact information: john@example.com](contact.png)\n"
-            "Email: test@example.com"
-        )
-        source_map: dict[str, object] = {"file_path": "test.txt"}
-        doc_id = "test_doc_1"
-
-        candidates = extract_field_candidates(
-            field_name="email",
-            field_type=str,
-            field_description="Email address",
-            markdown_content=markdown,
-            doc_id=doc_id,
-            source_map=source_map,
-        )
-
-        # Should extract from markdown content including alt text
-        assert isinstance(candidates, list)
-        assert len(candidates) >= 1
+    # Note: Tests for extraction with tables and images have been removed
+    # as they relied on the deprecated extract_field_candidates function.
+    # These edge cases are now covered by run_extraction tests.
 
 
 @patch("ctrlf.app.extract.generate_synthetic_example")
