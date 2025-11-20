@@ -7,6 +7,7 @@ authors = [{ name = "Michael I Chen", email = "michael.chen.0@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
     "gradio>=4.0.0",
+    "google-genai>=1.3.0",
     "json-schema-to-pydantic>=0.1.0",
     "jsonschema>=4.0.0",
     "langextract>=0.1.0",

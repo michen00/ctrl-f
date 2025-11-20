@@ -172,6 +172,7 @@ def process_corpus(  # noqa: C901, PLR0912
                         ".pdf",
                         ".docx",
                         ".html",
+                        ".htm",
                         ".txt",
                         ".md",
                     }:

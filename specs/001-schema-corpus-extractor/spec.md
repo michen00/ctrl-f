@@ -83,7 +83,7 @@ A user encounters situations where multiple documents contain conflicting values
 - **FR-001**: System MUST accept schema input in both JSON Schema format and Pydantic model code format (flat schemas only - all fields must be primitive types or arrays of primitives; nested objects/arrays not supported in v0)
 - **FR-002**: System MUST accept a corpus of documents in multiple formats (PDF, DOCX, HTML, TXT, etc.) via file upload (directory, zip, or tar archive)
 - **FR-003**: System MUST convert all supported document formats to Markdown while preserving source location mapping (file, page, line, or character range)
-- **FR-004**: System MUST extract candidate values for each schema field from the corpus with zero fabrication (all candidates must be grounded in actual document content)
+- **FR-004**: System MUST extract candidate values for each schema field from the corpus with zero fabrication, utilizing dynamically generated synthetic examples to guide the extraction model
 - **FR-005**: System MUST provide provenance for each candidate value including: source document identifier, file path, location (page/line or char range), and surrounding context snippet
 - **FR-006**: System MUST normalize and deduplicate candidate values using similarity matching to group near-duplicates
 - **FR-007**: System MUST compute confidence scores for each candidate and identify consensus when one candidate has confidence ≥0.75 and margin ≥0.20 over the next highest candidate
@@ -101,6 +101,7 @@ A user encounters situations where multiple documents contain conflicting values
 - **FR-019**: System MUST process all documents locally with no network transmission of document content or extracted data
 - **FR-020**: System MUST provide optional PII redaction in UI previews (user-configurable patterns for sensitive data masking)
 - **FR-021**: System MUST operate as a single-user application with no authentication or access control requirements
+- **FR-022**: System MUST generate synthetic few-shot examples dynamically based on the provided schema using an LLM to improve extraction accuracy
 
 ### Key Entities _(include if feature involves data)_
 
