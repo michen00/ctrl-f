@@ -351,13 +351,16 @@ def _load_and_extend_schema(
     return model_class
 
 
-def _process_corpus_input(
+def _process_corpus_input(  # noqa: PLR0915
     corpus_file_path: str | None,
     corpus_dir_path: str | None,
     actual_progress: gr.Progress | NoOpProgress,
     progress_messages: list[str],
 ) -> list[Any]:
-    """Process corpus from file upload or directory path.
+    """Process corpus from file upload and/or directory path.
+
+    Both inputs can be provided simultaneously, and documents from both
+    sources will be combined into a single corpus.
 
     Returns:
         List of corpus documents
@@ -370,7 +373,10 @@ def _process_corpus_input(
     progress_messages.append("Processing corpus...")
 
     corpus_docs: list[Any] = []
+    docs_from_file: list[Any] = []
+    docs_from_dir: list[Any] = []
 
+    # Process file input if provided
     if corpus_file_path:
         # Check if it's an archive or a single document file
         corpus_path = Path(corpus_file_path)
@@ -384,6 +390,7 @@ def _process_corpus_input(
             tmpdir = tempfile.mkdtemp()
             try:
                 actual_progress(0.25, desc="Extracting archive...")
+                progress_messages.append("Extracting archive...")
                 _extract_archive(corpus_file_path, tmpdir)
 
                 # Check for cancellation after extraction
@@ -392,14 +399,24 @@ def _process_corpus_input(
                     msg = "Operation cancelled by user"
                     raise KeyboardInterrupt(msg)
 
+                # Calculate progress range for file processing
+                # If both inputs provided, file gets 0.25-0.4, dir gets 0.4-0.6
+                # If only file, it gets 0.25-0.6
+                start_pct = 0.25
+                end_pct = 0.4 if corpus_dir_path else 0.6
                 corpus_progress_callback = _create_corpus_progress_callback(
                     actual_progress,
                     progress_messages,
+                    start_pct=start_pct,
+                    end_pct=end_pct,
                 )
 
-                corpus_docs = process_corpus(
+                docs_from_file = process_corpus(
                     tmpdir,
                     progress_callback=corpus_progress_callback,
+                )
+                progress_messages.append(
+                    f"Processed {len(docs_from_file)} document(s) from file upload."
                 )
             finally:
                 # Clean up temp directory after processing
@@ -407,34 +424,72 @@ def _process_corpus_input(
         else:
             # Single document file - convert with markitdown
             actual_progress(0.25, desc="Converting document to markdown...")
+            progress_messages.append("Converting document to markdown...")
+
+            # Calculate progress range for file processing
+            start_pct = 0.25
+            end_pct = 0.4 if corpus_dir_path else 0.6
             corpus_progress_callback = _create_corpus_progress_callback(
                 actual_progress,
                 progress_messages,
+                start_pct=start_pct,
+                end_pct=end_pct,
             )
 
-            corpus_docs = process_corpus(
+            docs_from_file = process_corpus(
                 corpus_file_path,
                 progress_callback=corpus_progress_callback,
             )
-    elif corpus_dir_path:
+            progress_messages.append(
+                f"Processed {len(docs_from_file)} document(s) from file upload."
+            )
+
+        # Check for cancellation after file processing
+        cancel_result = _check_cancellation(actual_progress, progress_messages)
+        if cancel_result:
+            msg = "Operation cancelled by user"
+            raise KeyboardInterrupt(msg)
+
+    # Process directory input if provided
+    if corpus_dir_path:
         # Resolve and validate text input path
         resolved_path = _resolve_and_validate_path(corpus_dir_path)
 
+        # Calculate progress range for directory processing
+        # If both inputs provided, dir gets 0.4-0.6
+        # If only dir, it gets 0.25-0.6
+        start_pct = 0.4 if corpus_file_path else 0.25
+        end_pct = 0.6
         corpus_progress_callback = _create_corpus_progress_callback(
             actual_progress,
             progress_messages,
+            start_pct=start_pct,
+            end_pct=end_pct,
         )
 
-        corpus_docs = process_corpus(
+        docs_from_dir = process_corpus(
             resolved_path,
             progress_callback=corpus_progress_callback,
         )
-    else:
+        progress_messages.append(
+            f"Processed {len(docs_from_dir)} document(s) from directory path."
+        )
+
+        # Check for cancellation after directory processing
+        cancel_result = _check_cancellation(actual_progress, progress_messages)
+        if cancel_result:
+            msg = "Operation cancelled by user"
+            raise KeyboardInterrupt(msg)
+
+    # Combine documents from both sources
+    if not corpus_file_path and not corpus_dir_path:
         msg = "Corpus file or directory is required"
         raise ValueError(msg)
 
-    actual_progress(0.6, desc=f"Processed {len(corpus_docs)} documents.")
-    progress_messages.append(f"Processed {len(corpus_docs)} documents.")
+    corpus_docs = docs_from_file + docs_from_dir
+
+    actual_progress(0.6, desc=f"Processed {len(corpus_docs)} total documents.")
+    progress_messages.append(f"Processed {len(corpus_docs)} total documents.")
 
     # Check for cancellation
     cancel_result = _check_cancellation(actual_progress, progress_messages)
@@ -705,23 +760,71 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             for i, interaction in enumerate(instrumentation.interactions, 1):
                 # Truncate very long completions for display
                 completion = interaction.completion
+                completion_preview = completion
                 if len(completion) > 2000:
-                    completion = completion[:2000] + "\n... (truncated)"
+                    completion_preview = completion[:2000] + "\n... (truncated)"
+
+                # Build metadata section
+                metadata_lines = []
+                metadata_lines.append(f"**Model**: `{interaction.model}`")
+
+                has_tokens = (
+                    interaction.prompt_tokens is not None
+                    or interaction.completion_tokens is not None
+                )
+                if has_tokens:
+                    token_info = []
+                    if interaction.prompt_tokens is not None:
+                        token_info.append(
+                            f"Prompt: {interaction.prompt_tokens:,} tokens"
+                        )
+                    if interaction.completion_tokens is not None:
+                        token_info.append(
+                            f"Completion: {interaction.completion_tokens:,} tokens"
+                        )
+                    if token_info:
+                        metadata_lines.append(
+                            f"**Token Usage**: {', '.join(token_info)}"
+                        )
+
+                if interaction.finish_reason:
+                    metadata_lines.append(
+                        f"**Finish Reason**: `{interaction.finish_reason}`"
+                    )
+
+                if interaction.response_metadata:
+                    metadata_items = []
+                    if "total_tokens" in interaction.response_metadata:
+                        total = interaction.response_metadata["total_tokens"]
+                        metadata_items.append(f"Total: {total:,} tokens")
+                    if "safety_ratings" in interaction.response_metadata:
+                        safety = interaction.response_metadata["safety_ratings"]
+                        if isinstance(safety, list) and safety:
+                            metadata_items.append(
+                                f"Safety ratings: {len(safety)} categories checked"
+                            )
+                    if metadata_items:
+                        metadata_lines.append(
+                            f"**Additional Info**: {', '.join(metadata_items)}"
+                        )
 
                 append_line(
                     cleandoc(f"""
                         ### {i}. {interaction.step_name}
-                        **Model**: `{interaction.model}`
+
+                        {chr(10).join(metadata_lines)}
 
                         #### Prompt:
                         ```
                         {interaction.prompt}
                         ```
 
-                        #### Completion:
+                        #### Model Response:
                         ```
-                        {completion}
+                        {completion_preview}
                         ```
+
+                        **Response Length**: {len(completion):,} characters
 
                         ---
                         """)

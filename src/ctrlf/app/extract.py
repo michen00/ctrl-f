@@ -135,11 +135,47 @@ Example text:
 
     completion_text = response.text if response.text else ""
 
+    # Extract metadata from response
+    prompt_tokens = None
+    completion_tokens = None
+    finish_reason = None
+    response_metadata: dict[str, object] = {}
+
+    # Try to extract token usage
+    if hasattr(response, "usage_metadata"):
+        usage = response.usage_metadata
+        if hasattr(usage, "prompt_token_count"):
+            prompt_tokens = usage.prompt_token_count
+        if hasattr(usage, "candidates_token_count"):
+            completion_tokens = usage.candidates_token_count
+        if hasattr(usage, "total_token_count"):
+            response_metadata["total_tokens"] = usage.total_token_count
+
+    # Try to extract finish reason from candidates
+    if hasattr(response, "candidates") and response.candidates:
+        candidate = response.candidates[0]
+        if hasattr(candidate, "finish_reason"):
+            finish_reason = str(candidate.finish_reason)
+        if hasattr(candidate, "safety_ratings"):
+            response_metadata["safety_ratings"] = [
+                {
+                    "category": str(r.category) if hasattr(r, "category") else None,
+                    "probability": str(r.probability)
+                    if hasattr(r, "probability")
+                    else None,
+                }
+                for r in candidate.safety_ratings
+            ]
+
     instrumentation = PrePromptInteraction(
         step_name="generate_synthetic_example",
         prompt=prompt,
         completion=completion_text,
         model=model_name,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        finish_reason=finish_reason,
+        response_metadata=response_metadata,
     )
 
     return completion_text, instrumentation
@@ -193,6 +229,39 @@ Output:
     # Parse the output
     extractions: list[Extraction] = []
     response_text = response.text or ""
+
+    # Extract metadata from response
+    prompt_tokens = None
+    completion_tokens = None
+    finish_reason = None
+    response_metadata: dict[str, object] = {}
+
+    # Try to extract token usage
+    if hasattr(response, "usage_metadata"):
+        usage = response.usage_metadata
+        if hasattr(usage, "prompt_token_count"):
+            prompt_tokens = usage.prompt_token_count
+        if hasattr(usage, "candidates_token_count"):
+            completion_tokens = usage.candidates_token_count
+        if hasattr(usage, "total_token_count"):
+            response_metadata["total_tokens"] = usage.total_token_count
+
+    # Try to extract finish reason from candidates
+    if hasattr(response, "candidates") and response.candidates:
+        candidate = response.candidates[0]
+        if hasattr(candidate, "finish_reason"):
+            finish_reason = str(candidate.finish_reason)
+        if hasattr(candidate, "safety_ratings"):
+            response_metadata["safety_ratings"] = [
+                {
+                    "category": str(r.category) if hasattr(r, "category") else None,
+                    "probability": str(r.probability)
+                    if hasattr(r, "probability")
+                    else None,
+                }
+                for r in candidate.safety_ratings
+            ]
+
     if response_text:
         text_to_parse = response_text.strip()
 
@@ -262,6 +331,10 @@ Output:
         prompt=prompt,
         completion=response_text,
         model=model_name,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        finish_reason=finish_reason,
+        response_metadata=response_metadata,
     )
 
     return extractions, instrumentation

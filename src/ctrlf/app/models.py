@@ -203,12 +203,28 @@ class PrePromptInteraction(BaseModel):
         prompt: The prompt sent to the LLM
         completion: The response/completion from the LLM
         model: The model used (e.g., "gemini-2.5-flash")
+        prompt_tokens: Number of tokens in the prompt (if available)
+        completion_tokens: Number of tokens in the completion (if available)
+        finish_reason: Reason why the generation finished (if available)
+        response_metadata: Additional metadata from the response (if available)
     """
 
     step_name: str = Field(..., min_length=1, description="Name of the pre-prompt step")
     prompt: str = Field(..., min_length=1, description="Prompt sent to LLM")
     completion: str = Field(..., description="LLM response/completion")
     model: str = Field(..., min_length=1, description="Model used for this interaction")
+    prompt_tokens: int | None = Field(
+        default=None, description="Number of tokens in the prompt"
+    )
+    completion_tokens: int | None = Field(
+        default=None, description="Number of tokens in the completion"
+    )
+    finish_reason: str | None = Field(
+        default=None, description="Reason why generation finished"
+    )
+    response_metadata: dict[str, object] = Field(
+        default_factory=dict, description="Additional response metadata"
+    )
 
 
 class PrePromptInstrumentation(BaseModel):
