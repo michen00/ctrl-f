@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 logger = get_logger(__name__)
-md = MarkItDown()
+md = MarkItDown(enable_plugins=False)
 
 
 class CorpusDocument(NamedTuple):
@@ -82,6 +82,9 @@ def convert_document_to_markdown(
 ) -> tuple[str, dict[str, Any]]:
     """Convert a document to Markdown and return source mapping.
 
+    Uses markitdown to convert any supported file type to markdown.
+    Let markitdown handle file type detection and conversion.
+
     Args:
         file_path: Path to document file
 
@@ -90,22 +93,16 @@ def convert_document_to_markdown(
 
     Raises:
         FileNotFoundError: If file doesn't exist
-        ValueError: If file format is unsupported
-        RuntimeError: If conversion fails (corrupted file or encoding error)
+        RuntimeError: If conversion fails (corrupted file, encoding error,
+            or unsupported format)
     """
     path = Path(file_path)
     if not path.exists():
         msg = f"File not found: {file_path}"
         raise FileNotFoundError(msg)
 
-    # Check if format is supported
-    supported_extensions = {".pdf", ".docx", ".html", ".htm", ".txt", ".md"}
-    if path.suffix.lower() not in supported_extensions:
-        msg = f"Unsupported file format: {path.suffix}"
-        raise ValueError(msg)
-
     try:
-        # Convert using markitdown
+        # Convert using markitdown - it will handle file type detection
         result = md.convert(str(path))
         markdown_content = result.text_content
 
@@ -167,45 +164,52 @@ def process_corpus(  # noqa: C901, PLR0912
             temp_dir = Path(temp_dir_context.name)
             with zipfile.ZipFile(path, "r") as zip_ref:
                 for member in zip_ref.namelist():
-                    member_path = Path(member)
-                    if member_path.suffix.lower() in {
-                        ".pdf",
-                        ".docx",
-                        ".html",
-                        ".htm",
-                        ".txt",
-                        ".md",
-                    }:
-                        # Extract to temp location
+                    Path(member)
+                    # Extract all files - let markitdown handle conversion
+                    # Skip directories
+                    if not member.endswith("/"):
                         zip_ref.extract(member, temp_dir)
-                        files_to_process.append(temp_dir / member)
-        elif path.name.endswith(".tar.gz") or path.suffix.lower() == ".tar":
+                        extracted_path = temp_dir / member
+                        if extracted_path.is_file():
+                            files_to_process.append(extracted_path)
+        elif path.name.lower().endswith(".tar.gz") or path.suffix.lower() == ".tar":
             # Handle tar and tar.gz archives
             temp_dir_context = tempfile.TemporaryDirectory(prefix="ctrlf_extract_")
             temp_dir = Path(temp_dir_context.name)
             # Determine tar mode based on file extension
-            mode = "r:gz" if path.name.endswith(".tar.gz") else "r"
+            mode = "r:gz" if path.name.lower().endswith(".tar.gz") else "r"
             with tarfile.open(path, mode) as tar_ref:  # type: ignore[call-overload]
                 for member in tar_ref.getmembers():
                     if member.isfile():
-                        member_path = Path(member.name)
-                        if member_path.suffix.lower() in {
-                            ".pdf",
-                            ".docx",
-                            ".html",
-                            ".htm",
-                            ".txt",
-                            ".md",
-                        }:
-                            # Extract to temp location
-                            tar_ref.extract(member, temp_dir)
-                            files_to_process.append(temp_dir / member.name)
+                        # Extract all files - let markitdown handle conversion
+                        tar_ref.extract(member, temp_dir)
+                        files_to_process.append(temp_dir / member.name)
         else:
-            # Single file (not an archive)
+            # Single file (not an archive) - let markitdown handle conversion
             files_to_process.append(path)
     elif path.is_dir():
         # Directory of files (recursive search)
-        for ext in ["*.pdf", "*.docx", "*.html", "*.htm", "*.txt", "*.md"]:
+        # Process all files - let markitdown handle what it can convert
+        # Common document extensions that markitdown typically supports
+        common_extensions = [
+            "*.pdf",
+            "*.docx",
+            "*.doc",
+            "*.html",
+            "*.htm",
+            "*.txt",
+            "*.md",
+            "*.xlsx",
+            "*.xls",
+            "*.pptx",
+            "*.ppt",
+            "*.rtf",
+            "*.odt",
+            "*.ods",
+            "*.csv",
+            "*.tsv",
+        ]
+        for ext in common_extensions:
             files_to_process.extend(path.rglob(ext))
 
     total_files = len(files_to_process)

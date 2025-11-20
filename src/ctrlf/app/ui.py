@@ -4,7 +4,6 @@ from __future__ import annotations
 
 __all__ = (
     "ExtractionWorkflowResult",
-    "UnpackedResult",
     "create_review_interface",
     "create_upload_interface",
     "show_source_context",
@@ -18,7 +17,7 @@ import zipfile
 from datetime import UTC, datetime
 from inspect import cleandoc
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import gradio as gr
 from slugify import slugify
@@ -28,7 +27,13 @@ from ctrlf.app.errors import ErrorSummary, collect_errors
 from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import process_corpus
 from ctrlf.app.logging_conf import get_logger
-from ctrlf.app.models import Candidate, PersistedRecord, Resolution, SourceRef
+from ctrlf.app.models import (
+    Candidate,
+    PersistedRecord,
+    PrePromptInstrumentation,
+    Resolution,
+    SourceRef,
+)
 from ctrlf.app.schema_io import (
     convert_json_schema_to_pydantic,
     extend_schema,
@@ -72,19 +77,6 @@ class ExtractionWorkflowResult(NamedTuple):
     error_message: str
     extraction_result: ExtractionResult | None
     error_visibility: Any
-
-
-class UnpackedResult(NamedTuple):
-    """Unpacked result for Gradio outputs."""
-
-    progress_message: str
-    """Progress status message"""
-
-    error_update: Any
-    """Gradio update object for error output"""
-
-    extraction_result: ExtractionResult | None
-    """Extraction result or None if failed"""
 
 
 def _safe_snippet(snippet: str) -> str:
@@ -212,11 +204,12 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
     Raises:
         ValueError: If archive format is unsupported
     """
-    if archive_path.endswith(".zip"):
+    archive_lower = archive_path.lower()
+    if archive_lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
             zip_ref.extractall(extract_to)  # noqa: S202
-    elif archive_path.endswith((".tar", ".tar.gz")):
-        mode = "r:gz" if archive_path.endswith(".tar.gz") else "r"
+    elif archive_lower.endswith((".tar", ".tar.gz")):
+        mode = "r:gz" if archive_lower.endswith(".tar.gz") else "r"
         with tarfile.open(archive_path, mode) as tar_ref:  # type: ignore[call-overload]
             tar_ref.extractall(extract_to)  # noqa: S202
     else:
@@ -227,7 +220,7 @@ def _extract_archive(archive_path: str, extract_to: str) -> None:
 def _check_cancellation(
     progress: gr.Progress | NoOpProgress,
     progress_messages: list[str],
-) -> ExtractionWorkflowResult | None:
+) -> tuple[ExtractionWorkflowResult, PrePromptInstrumentation] | None:
     """Check if operation was cancelled and return cancellation result if so.
 
     Args:
@@ -235,15 +228,19 @@ def _check_cancellation(
         progress_messages: List of progress messages
 
     Returns:
-        ExtractionWorkflowResult if cancelled, None otherwise
+        Tuple of (ExtractionWorkflowResult, PrePromptInstrumentation) if cancelled,
+        None otherwise
     """
     if progress.cancelled:  # type: ignore[union-attr]
         progress_messages.append("Operation cancelled by user.")
-        return ExtractionWorkflowResult(
-            progress_message="\n".join(progress_messages),
-            error_message="Operation cancelled by user.",
-            extraction_result=None,
-            error_visibility=gr.update(visible=True),
+        return (
+            ExtractionWorkflowResult(
+                progress_message="\n".join(progress_messages),
+                error_message="Operation cancelled by user.",
+                extraction_result=None,
+                error_visibility=gr.update(visible=True),
+            ),
+            PrePromptInstrumentation(interactions=[]),
         )
     return None
 
@@ -338,6 +335,191 @@ def _get_directory_path(file_input: str | list[str] | None) -> str | None:
     return None
 
 
+def _load_and_extend_schema(
+    schema_file_path: str,
+    actual_progress: gr.Progress | NoOpProgress,
+    progress_messages: list[str],
+) -> type[Any]:
+    """Load and extend schema from file.
+
+    Args:
+        schema_file_path: Path to schema file (must not be None)
+        actual_progress: Progress tracker
+        progress_messages: List to append progress messages to
+
+    Returns:
+        Extended Pydantic model class
+
+    Raises:
+        ValueError: If schema file is invalid
+        KeyboardInterrupt: If operation is cancelled
+    """
+    actual_progress(0, desc="Loading schema...")
+    progress_messages.append("Loading schema...")
+
+    # Check for cancellation
+    cancel_result = _check_cancellation(actual_progress, progress_messages)
+    if cancel_result:
+        msg = "Operation cancelled by user"
+        raise KeyboardInterrupt(msg)
+
+    # Load schema (type is inferred from file extension)
+    raw_model_class = _load_schema(schema_file_path)
+
+    # Extend schema to support multiple values per field
+    model_class = extend_schema(raw_model_class)
+
+    actual_progress(0.2, desc="Schema loaded successfully.")
+    progress_messages.append("Schema loaded successfully.")
+
+    # Check for cancellation
+    cancel_result = _check_cancellation(actual_progress, progress_messages)
+    if cancel_result:
+        msg = "Operation cancelled by user"
+        raise KeyboardInterrupt(msg)
+
+    return model_class
+
+
+def _process_corpus_input(
+    corpus_file_path: str | None,
+    corpus_dir_path: str | None,
+    actual_progress: gr.Progress | NoOpProgress,
+    progress_messages: list[str],
+) -> list[Any]:
+    """Process corpus from file upload or directory path.
+
+    Args:
+        corpus_file_path: Path to corpus archive or document file
+        corpus_dir_path: Text input path to corpus directory or file
+        actual_progress: Progress tracker
+        progress_messages: List to append progress messages to
+
+    Returns:
+        List of corpus documents
+
+    Raises:
+        ValueError: If no corpus input is provided
+        KeyboardInterrupt: If operation is cancelled
+    """
+    actual_progress(0.2, desc="Processing corpus...")
+    progress_messages.append("Processing corpus...")
+
+    corpus_docs: list[Any] = []
+
+    if corpus_file_path:
+        # Check if it's an archive or a single document file
+        corpus_path = Path(corpus_file_path)
+        is_archive = corpus_path.suffix.lower() in (
+            ".zip",
+            ".tar",
+        ) or corpus_path.name.lower().endswith(".tar.gz")
+
+        if is_archive:
+            # Extract archive to temp directory
+            tmpdir = tempfile.mkdtemp()
+            try:
+                actual_progress(0.25, desc="Extracting archive...")
+                _extract_archive(corpus_file_path, tmpdir)
+
+                # Check for cancellation after extraction
+                cancel_result = _check_cancellation(actual_progress, progress_messages)
+                if cancel_result:
+                    msg = "Operation cancelled by user"
+                    raise KeyboardInterrupt(msg)
+
+                corpus_progress_callback = _create_corpus_progress_callback(
+                    actual_progress,
+                    progress_messages,
+                )
+
+                corpus_docs = process_corpus(
+                    tmpdir,
+                    progress_callback=corpus_progress_callback,
+                )
+            finally:
+                # Clean up temp directory after processing
+                shutil.rmtree(tmpdir, ignore_errors=True)
+        else:
+            # Single document file - convert with markitdown
+            actual_progress(0.25, desc="Converting document to markdown...")
+            corpus_progress_callback = _create_corpus_progress_callback(
+                actual_progress,
+                progress_messages,
+            )
+
+            corpus_docs = process_corpus(
+                corpus_file_path,
+                progress_callback=corpus_progress_callback,
+            )
+    elif corpus_dir_path:
+        # Resolve and validate text input path
+        resolved_path = _resolve_and_validate_path(corpus_dir_path)
+
+        corpus_progress_callback = _create_corpus_progress_callback(
+            actual_progress,
+            progress_messages,
+        )
+
+        corpus_docs = process_corpus(
+            resolved_path,
+            progress_callback=corpus_progress_callback,
+        )
+    else:
+        msg = "Corpus file or directory is required"
+        raise ValueError(msg)
+
+    actual_progress(0.6, desc=f"Processed {len(corpus_docs)} documents.")
+    progress_messages.append(f"Processed {len(corpus_docs)} documents.")
+
+    # Check for cancellation
+    cancel_result = _check_cancellation(actual_progress, progress_messages)
+    if cancel_result:
+        msg = "Operation cancelled by user"
+        raise KeyboardInterrupt(msg)
+
+    return corpus_docs
+
+
+def _run_extraction_step(
+    model_class: type[Any],
+    corpus_docs: list[Any],
+    actual_progress: gr.Progress | NoOpProgress,
+    progress_messages: list[str],
+) -> tuple[ExtractionResult, PrePromptInstrumentation]:
+    """Run the extraction step.
+
+    Args:
+        model_class: Extended Pydantic model class
+        corpus_docs: List of corpus documents
+        actual_progress: Progress tracker
+        progress_messages: List to append progress messages to
+
+    Returns:
+        Tuple of (extraction_result, instrumentation)
+
+    Raises:
+        KeyboardInterrupt: If operation is cancelled
+    """
+    actual_progress(0.6, desc="Running extraction...")
+    progress_messages.append("Running extraction...")
+
+    # Check for cancellation before starting extraction
+    cancel_result = _check_cancellation(actual_progress, progress_messages)
+    if cancel_result:
+        msg = "Operation cancelled by user"
+        raise KeyboardInterrupt(msg)
+
+    # Run extraction
+    extraction_result, instrumentation = run_extraction(model_class, corpus_docs)
+
+    actual_progress(0.95, desc="Extraction complete. Finalizing...")
+    progress_messages.append("Extraction complete.")
+
+    actual_progress(1.0, desc="Complete!")
+    return extraction_result, instrumentation
+
+
 def _resolve_and_validate_path(path_input: str | None) -> str:
     """Resolve and validate a text input path.
 
@@ -404,8 +586,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
             with gr.Column():
                 corpus_file = gr.File(
-                    label="Corpus (Directory or Archive)",
-                    file_types=[".zip", ".tar", ".tar.gz"],
+                    label="Corpus (Document or Archive)",
                     type="filepath",
                 )
                 corpus_dir = gr.Textbox(
@@ -444,23 +625,28 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             visible=False,
         )
         extraction_result_state = gr.State()
+        instrumentation_state = gr.State()
 
-        def _raise_cancellation() -> None:
-            """Raise KeyboardInterrupt for cancellation handling.
+        # Pre-prompt instrumentation display
+        with gr.Accordion("Pre-Prompt Instrumentation", open=False):
+            instrumentation_display = gr.Markdown(
+                value="No instrumentation data available yet.",
+                label="Pre-Prompt Interactions",
+            )
 
-            This is a helper function to satisfy linter rules about abstracting raises.
-            """
-            msg = "Operation cancelled by user"
-            raise KeyboardInterrupt(msg)
+        def _raise_schema_required_error() -> None:
+            """Raise ValueError for missing schema file."""
+            msg = "Schema file is required"
+            raise ValueError(msg)
 
-        def run_extraction_workflow(  # noqa: PLR0915
+        def run_extraction_workflow(
             schema_file_path: str | None,
             corpus_file_path: str | None,
             corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
-        ) -> ExtractionWorkflowResult:
+        ) -> tuple[ExtractionWorkflowResult, PrePromptInstrumentation]:
             """Run the extraction workflow.
 
             Args:
@@ -484,131 +670,46 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
             try:
                 # Step 1: Load schema (0-20%)
-                actual_progress(0, desc="Loading schema...")
-                progress_messages.append("Loading schema...")
-
-                # Check for cancellation
-                cancel_result = _check_cancellation(actual_progress, progress_messages)
-                if cancel_result:
-                    return cancel_result
-
                 if not schema_file_path:
-                    msg = "Schema file is required"
-                    raise ValueError(msg)  # noqa: TRY301
-
-                # Load schema (type is inferred from file extension)
-                raw_model_class = _load_schema(schema_file_path)
-
-                # Extend schema to support multiple values per field
-                model_class = extend_schema(raw_model_class)
-
-                actual_progress(0.2, desc="Schema loaded successfully.")
-                progress_messages.append("Schema loaded successfully.")
-
-                # Check for cancellation
-                cancel_result = _check_cancellation(actual_progress, progress_messages)
-                if cancel_result:
-                    return cancel_result
+                    _raise_schema_required_error()
+                # Type narrowing: schema_file_path is guaranteed to be str here
+                # after the None check above
+                model_class = _load_and_extend_schema(
+                    cast("str", schema_file_path), actual_progress, progress_messages
+                )
 
                 # Step 2: Process corpus (20-60%)
-                actual_progress(0.2, desc="Processing corpus...")
-                progress_messages.append("Processing corpus...")
-
-                corpus_docs: list[Any] = []
-
-                if corpus_file_path:
-                    # Extract archive to temp directory
-                    # Note: We need to keep the temp directory alive during processing
-                    # So we'll extract first, then process
-                    tmpdir = tempfile.mkdtemp()
-                    try:
-                        actual_progress(0.25, desc="Extracting archive...")
-                        _extract_archive(corpus_file_path, tmpdir)
-
-                        # Check for cancellation after extraction
-                        cancel_result = _check_cancellation(
-                            actual_progress, progress_messages
-                        )
-                        if cancel_result:
-                            return cancel_result
-
-                        corpus_progress_callback = _create_corpus_progress_callback(
-                            actual_progress,
-                            progress_messages,
-                        )
-
-                        corpus_docs = process_corpus(
-                            tmpdir,
-                            progress_callback=corpus_progress_callback,
-                        )
-                    finally:
-                        # Clean up temp directory after processing
-                        shutil.rmtree(tmpdir, ignore_errors=True)
-                elif corpus_dir_path:
-                    # Resolve and validate text input path
-                    # This handles ~ expansion, spaces, special characters, etc.
-                    resolved_path = _resolve_and_validate_path(corpus_dir_path)
-
-                    # process_corpus handles both files and directories:
-                    # - If it's a file, it processes that single file
-                    # - If it's a directory, it recursively processes
-                    #   all supported files
-                    corpus_progress_callback = _create_corpus_progress_callback(
-                        actual_progress,
-                        progress_messages,
-                    )
-
-                    corpus_docs = process_corpus(
-                        resolved_path,
-                        progress_callback=corpus_progress_callback,
-                    )
-                else:
-                    msg = "Corpus file or directory is required"
-                    raise ValueError(msg)  # noqa: TRY301
-
-                actual_progress(0.6, desc=f"Processed {len(corpus_docs)} documents.")
-                progress_messages.append(f"Processed {len(corpus_docs)} documents.")
-
-                # Check for cancellation
-                cancel_result = _check_cancellation(actual_progress, progress_messages)
-                if cancel_result:
-                    return cancel_result
+                corpus_docs = _process_corpus_input(
+                    corpus_file_path,
+                    corpus_dir_path,
+                    actual_progress,
+                    progress_messages,
+                )
 
                 # Step 3: Run extraction (60-100%)
-                actual_progress(0.6, desc="Running extraction...")
-                progress_messages.append("Running extraction...")
+                extraction_result, instrumentation = _run_extraction_step(
+                    model_class, corpus_docs, actual_progress, progress_messages
+                )
 
-                # Check for cancellation before starting extraction
-                cancel_result = _check_cancellation(actual_progress, progress_messages)
-                if cancel_result:
-                    return cancel_result
-
-                # Run extraction
-                # Note: Detailed progress tracking within extraction would require
-                # modifying run_extraction to accept a progress callback
-                extraction_result = run_extraction(model_class, corpus_docs)
-
-                actual_progress(0.95, desc="Extraction complete. Finalizing...")
-                progress_messages.append("Extraction complete.")
-
-                actual_progress(1.0, desc="Complete!")
                 progress_msg = "\n".join(progress_messages)
-                return ExtractionWorkflowResult(
+                workflow_result = ExtractionWorkflowResult(
                     progress_message=progress_msg,
                     error_message="",
                     extraction_result=extraction_result,
                     error_visibility=gr.update(visible=False),
                 )
+                return workflow_result, instrumentation  # noqa: TRY300
 
             except KeyboardInterrupt:
                 # Handle cancellation
                 progress_messages.append("Operation cancelled by user.")
-                return ExtractionWorkflowResult(
+                workflow_result = ExtractionWorkflowResult(
                     progress_message="\n".join(progress_messages),
                     error_message="Operation cancelled by user.",
                     extraction_result=None,
                     error_visibility=gr.update(visible=True),
                 )
+                return workflow_result, PrePromptInstrumentation(interactions=[])
             except Exception as e:
                 collect_errors(
                     error_summary,
@@ -619,24 +720,70 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 error_msg = error_summary.get_summary()
                 progress_msg = "\n".join(progress_messages)
                 logger.exception("Extraction workflow failed")
-                return ExtractionWorkflowResult(
+                workflow_result = ExtractionWorkflowResult(
                     progress_message=progress_msg,
                     error_message=error_msg,
                     extraction_result=None,
                     error_visibility=gr.update(visible=True),
                 )
+                return workflow_result, PrePromptInstrumentation(interactions=[])
+
+        def format_instrumentation(
+            instrumentation: PrePromptInstrumentation,
+        ) -> str:
+            """Format instrumentation data for display.
+
+            Args:
+                instrumentation: Pre-prompt instrumentation data
+
+            Returns:
+                Formatted markdown string
+            """
+            if not instrumentation.interactions:
+                return "No pre-prompt interactions recorded."
+
+            lines = ["## Pre-Prompt Interactions\n"]
+            append_line = lines.append
+            for i, interaction in enumerate(instrumentation.interactions, 1):
+                # Truncate very long completions for display
+                completion = interaction.completion
+                if len(completion) > 2000:
+                    completion = completion[:2000] + "\n... (truncated)"
+
+                append_line(
+                    cleandoc(f"""
+                        ### {i}. {interaction.step_name}
+                        **Model**: `{interaction.model}`
+
+                        #### Prompt:
+                        ```
+                        {interaction.prompt}
+                        ```
+
+                        #### Completion:
+                        ```
+                        {completion}
+                        ```
+
+                        ---
+                        """)
+                )
+
+            return "\n".join(lines)
 
         def unpack_result(
             result: ExtractionWorkflowResult,
-        ) -> UnpackedResult:
+            instrumentation: PrePromptInstrumentation,
+        ) -> tuple[str, Any, ExtractionResult | None, str, PrePromptInstrumentation]:
             """Unpack ExtractionWorkflowResult for Gradio outputs.
 
             Args:
                 result: Extraction workflow result
+                instrumentation: Pre-prompt instrumentation data
 
             Returns:
-                UnpackedResult with progress_message, error_update, and
-                extraction_result
+                Tuple of (progress_message, error_update, extraction_result,
+                formatted instrumentation markdown, instrumentation)
             """
             # Combine error message and visibility into a single gr.update() object
             # Show error output if there's an error message, hide otherwise
@@ -644,10 +791,13 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 value=result.error_message,
                 visible=bool(result.error_message),
             )
-            return UnpackedResult(
-                progress_message=result.progress_message,
-                error_update=error_update,
-                extraction_result=result.extraction_result,
+            instrumentation_md = format_instrumentation(instrumentation)
+            return (
+                result.progress_message,
+                error_update,
+                result.extraction_result,
+                instrumentation_md,
+                instrumentation,
             )
 
         def run_extraction_with_progress(
@@ -657,7 +807,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
-        ) -> UnpackedResult:
+        ) -> tuple[str, Any, ExtractionResult | None, str, PrePromptInstrumentation]:
             """Wrapper to run extraction workflow and unpack result.
 
             Args:
@@ -669,9 +819,10 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 progress: Gradio progress tracker
 
             Returns:
-                UnpackedResult for Gradio outputs
+                Tuple of (progress_message, error_update, extraction_result,
+                formatted instrumentation markdown, instrumentation)
             """
-            result = run_extraction_workflow(
+            result, instrumentation = run_extraction_workflow(
                 schema_file_path,
                 corpus_file_path,
                 corpus_dir_path,
@@ -679,7 +830,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 _confidence,
                 progress,
             )
-            return unpack_result(result)
+            return unpack_result(result, instrumentation)
 
         run_button.click(
             fn=run_extraction_with_progress,
@@ -694,6 +845,8 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
                 progress_output,
                 error_output,
                 extraction_result_state,
+                instrumentation_display,
+                instrumentation_state,
             ],
         )
 

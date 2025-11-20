@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import process_corpus
-from ctrlf.app.models import ExtractionResult
+from ctrlf.app.models import ExtractionResult, PrePromptInteraction
 from ctrlf.app.schema_io import extend_schema, import_pydantic_model
 
 
@@ -60,9 +60,24 @@ class TestEndToEndWorkflow:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test complete workflow: ingest -> extract -> aggregate."""
-        # Mock setup
-        mock_gen_example.return_value = "Example"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example",
+            PrePromptInteraction(
+                step_name="generate_synthetic_example",
+                prompt="test prompt",
+                completion="Example",
+                model="gemini-2.5-flash",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="generate_example_extractions",
+                prompt="test prompt",
+                completion="[]",
+                model="gemini-2.5-flash",
+            ),
+        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Extended Schema model
@@ -85,7 +100,9 @@ class TestEndToEndWorkflow:
             assert len(corpus_docs) == 2
 
             # Step 2: Run extraction
-            extraction_result = run_extraction(PersonModel, corpus_docs)
+            extraction_result, _instrumentation = run_extraction(
+                PersonModel, corpus_docs
+            )
             assert isinstance(extraction_result, ExtractionResult)
             assert len(extraction_result.results) == 2  # One per field
 
@@ -103,9 +120,24 @@ class TestEndToEndWorkflow:
         mock_gen_example: MagicMock,
     ) -> None:
         """Test complete workflow with Pydantic model input (User Story 2)."""
-        # Mock setup
-        mock_gen_example.return_value = "Example"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example",
+            PrePromptInteraction(
+                step_name="generate_synthetic_example",
+                prompt="test prompt",
+                completion="Example",
+                model="gemini-2.5-flash",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="generate_example_extractions",
+                prompt="test prompt",
+                completion="[]",
+                model="gemini-2.5-flash",
+            ),
+        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Pydantic model code
@@ -141,7 +173,9 @@ class InvoiceModel(BaseModel):
             assert len(corpus_docs) == 2
 
             # Step 5: Run extraction with extended model
-            extraction_result = run_extraction(extended_model, corpus_docs)
+            extraction_result, _instrumentation = run_extraction(
+                extended_model, corpus_docs
+            )
             assert isinstance(extraction_result, ExtractionResult)
             # invoice_number, amount, date
             assert len(extraction_result.results) == 3
@@ -164,9 +198,24 @@ class InvoiceModel(BaseModel):
         mock_gen_example: MagicMock,
     ) -> None:
         """Test disagreement resolution workflow (User Story 3)."""
-        # Mock setup
-        mock_gen_example.return_value = "Example"
-        mock_gen_extractions.return_value = []
+        mock_gen_example.return_value = (
+            "Example",
+            PrePromptInteraction(
+                step_name="generate_synthetic_example",
+                prompt="test prompt",
+                completion="Example",
+                model="gemini-2.5-flash",
+            ),
+        )
+        mock_gen_extractions.return_value = (
+            [],
+            PrePromptInteraction(
+                step_name="generate_example_extractions",
+                prompt="test prompt",
+                completion="[]",
+                model="gemini-2.5-flash",
+            ),
+        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Extended Schema model
@@ -192,7 +241,9 @@ class InvoiceModel(BaseModel):
             assert len(corpus_docs) == 3
 
             # Step 2: Run extraction
-            extraction_result = run_extraction(PersonModel, corpus_docs)
+            extraction_result, _instrumentation = run_extraction(
+                PersonModel, corpus_docs
+            )
             assert isinstance(extraction_result, ExtractionResult)
 
             # Step 3: Find a field with disagreements (no consensus)

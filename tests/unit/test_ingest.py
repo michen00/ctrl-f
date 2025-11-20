@@ -33,12 +33,12 @@ class TestConvertDocumentToMarkdown:
             convert_document_to_markdown("/nonexistent/file.txt")
 
     def test_convert_unsupported_format(self) -> None:
-        """Test that ValueError is raised for unsupported formats."""
+        """Test that RuntimeError is raised for unsupported formats."""
         with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match=r".*"):
+            with pytest.raises(RuntimeError, match=r".*"):
                 convert_document_to_markdown(temp_path)
         finally:
             Path(temp_path).unlink()
