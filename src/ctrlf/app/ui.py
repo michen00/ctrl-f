@@ -45,6 +45,8 @@ from ctrlf.app.storage import save_record
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from pydantic import BaseModel
+
     from ctrlf.app.models import ExtractionResult
 
 
@@ -81,9 +83,6 @@ class ExtractionWorkflowResult(NamedTuple):
 
 def _safe_snippet(snippet: str) -> str:
     """Escape triple backticks in snippet to prevent markdown fence breakage.
-
-    Args:
-        snippet: Source snippet text that may contain code fences
 
     Returns:
         Snippet with triple backticks escaped
@@ -133,9 +132,6 @@ def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False)
 def _infer_schema_type(schema_file_path: str) -> str:
     """Infer schema type from file extension.
 
-    Args:
-        schema_file_path: Path to schema file
-
     Returns:
         "JSON Schema" for .json files, "Pydantic Model" for .py files
 
@@ -154,15 +150,12 @@ def _infer_schema_type(schema_file_path: str) -> str:
 
 def _load_schema(
     schema_file_path: str,
-) -> type[Any]:
+) -> type[BaseModel]:
     """Load schema from file and return Pydantic model class.
 
     Schema type is automatically inferred from the file extension:
     - .json files are treated as JSON Schema
     - .py files are treated as Pydantic models
-
-    Args:
-        schema_file_path: Path to schema file
 
     Returns:
         Pydantic model class
@@ -197,10 +190,6 @@ def _load_schema(
 def _extract_archive(archive_path: str, extract_to: str) -> None:
     """Extract archive file to destination directory.
 
-    Args:
-        archive_path: Path to archive file
-        extract_to: Destination directory for extraction
-
     Raises:
         ValueError: If archive format is unsupported
     """
@@ -222,10 +211,6 @@ def _check_cancellation(
     progress_messages: list[str],
 ) -> tuple[ExtractionWorkflowResult, PrePromptInstrumentation] | None:
     """Check if operation was cancelled and return cancellation result if so.
-
-    Args:
-        progress: Progress tracker (may be NoOpProgress)
-        progress_messages: List of progress messages
 
     Returns:
         Tuple of (ExtractionWorkflowResult, PrePromptInstrumentation) if cancelled,
@@ -252,12 +237,6 @@ def _create_corpus_progress_callback(
     end_pct: float = 0.6,
 ) -> Callable[[int, int], None]:
     """Create progress callback for corpus processing.
-
-    Args:
-        progress: Progress tracker
-        progress_messages: List to append progress messages to
-        start_pct: Starting progress percentage (default: 0.2)
-        end_pct: Ending progress percentage (default: 0.6)
 
     Returns:
         Progress callback function
@@ -298,9 +277,6 @@ def _get_directory_path(file_input: str | list[str] | None) -> str | None:
     When a list is provided, finds the common parent directory of all files.
     Works equally well for selected files or directories.
 
-    Args:
-        file_input: File path string, list of file paths, or None
-
     Returns:
         Directory path as string, or None if input is None/empty
     """
@@ -339,13 +315,8 @@ def _load_and_extend_schema(
     schema_file_path: str,
     actual_progress: gr.Progress | NoOpProgress,
     progress_messages: list[str],
-) -> type[Any]:
+) -> type[BaseModel]:
     """Load and extend schema from file.
-
-    Args:
-        schema_file_path: Path to schema file (must not be None)
-        actual_progress: Progress tracker
-        progress_messages: List to append progress messages to
 
     Returns:
         Extended Pydantic model class
@@ -388,12 +359,6 @@ def _process_corpus_input(
     progress_messages: list[str],
 ) -> list[Any]:
     """Process corpus from file upload or directory path.
-
-    Args:
-        corpus_file_path: Path to corpus archive or document file
-        corpus_dir_path: Text input path to corpus directory or file
-        actual_progress: Progress tracker
-        progress_messages: List to append progress messages to
 
     Returns:
         List of corpus documents
@@ -482,7 +447,7 @@ def _process_corpus_input(
 
 
 def _run_extraction_step(
-    model_class: type[Any],
+    model_class: type[BaseModel],
     corpus_docs: list[Any],
     actual_progress: gr.Progress | NoOpProgress,
     progress_messages: list[str],
@@ -527,9 +492,6 @@ def _resolve_and_validate_path(path_input: str | None) -> str:
     - Tilde expansion (~)
     - Spaces and special characters
     - File vs directory detection
-
-    Args:
-        path_input: Text input path string or None
 
     Returns:
         Resolved absolute path as string
@@ -733,9 +695,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
         ) -> str:
             """Format instrumentation data for display.
 
-            Args:
-                instrumentation: Pre-prompt instrumentation data
-
             Returns:
                 Formatted markdown string
             """
@@ -776,10 +735,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
             instrumentation: PrePromptInstrumentation,
         ) -> tuple[str, Any, ExtractionResult | None, str, PrePromptInstrumentation]:
             """Unpack ExtractionWorkflowResult for Gradio outputs.
-
-            Args:
-                result: Extraction workflow result
-                instrumentation: Pre-prompt instrumentation data
 
             Returns:
                 Tuple of (progress_message, error_update, extraction_result,
@@ -858,10 +813,6 @@ def create_review_interface(  # noqa: PLR0915, C901
     extraction_result_state: gr.State,
 ) -> gr.Blocks:
     """Create Gradio interface for reviewing and resolving candidates.
-
-    Args:
-        extraction_result: Extraction results to review
-        extraction_result_state: State component to store extraction result
 
     Returns:
         Gradio interface component with field accordions
@@ -972,10 +923,6 @@ def create_review_interface(  # noqa: PLR0915, C901
                                 ) -> Callable[[], tuple[str, Any]]:
                                     """Create function to show source for candidate.
 
-                                    Args:
-                                        candidate_idx: Index of the candidate
-                                        candidates: List of candidates for this field
-
                                     Returns:
                                         Function to show source context
                                     """
@@ -1019,18 +966,12 @@ def create_review_interface(  # noqa: PLR0915, C901
                     ) -> Callable[[str], tuple[str, Any]]:
                         """Create a function to show source for selected candidate.
 
-                        Args:
-                            candidates: List of candidates for this field
-
                         Returns:
                             Function to show source context
                         """
 
                         def show_source_for_selected(selected: str) -> tuple[str, Any]:
                             """Show source context for selected candidate.
-
-                            Args:
-                                selected: Selected candidate string
 
                             Returns:
                                 Tuple of (source_context_markdown, visibility_update)
@@ -1438,9 +1379,6 @@ def create_review_interface(  # noqa: PLR0915, C901
             extraction_result: ExtractionResult | None,
         ) -> ExtractionResult | None:
             """Update the extraction result state for the review interface.
-
-            Args:
-                extraction_result: Extraction result to store
 
             Returns:
                 The extraction result

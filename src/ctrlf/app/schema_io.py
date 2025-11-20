@@ -56,9 +56,6 @@ def convert_json_schema_to_pydantic(schema: dict[str, Any]) -> type[BaseModel]:
     Uses json-schema-to-pydantic library to handle complex schemas including
     nested objects, references, and combiners.
 
-    Args:
-        schema: Validated JSON Schema
-
     Returns:
         Pydantic model class
 
@@ -146,9 +143,6 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
 def _extend_nested_model(nested_model_cls: type[BaseModel]) -> type[BaseModel]:
     """Recursively extend a nested BaseModel to convert all fields to arrays.
 
-    Args:
-        nested_model_cls: Nested BaseModel class to extend
-
     Returns:
         Extended model with all fields as List[type]
     """
@@ -163,10 +157,6 @@ def _convert_to_extended_type(
     """Convert a field type to its extended array form.
 
     Handles nested BaseModel types by recursively extending them.
-
-    Args:
-        _field_name: Name of the field (unused, kept for API consistency)
-        original_type: Original type annotation
 
     Returns:
         Extended type (List[type] or List[type] | None)
@@ -225,9 +215,6 @@ def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
     """Create Extended Schema by coercing all fields to arrays.
 
     Supports nested objects by recursively extending nested BaseModel types.
-
-    Args:
-        model_cls: Original Pydantic model
 
     Returns:
         Extended model with all fields as List[type]

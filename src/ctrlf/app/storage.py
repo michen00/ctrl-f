@@ -27,10 +27,6 @@ def get_storage_path() -> Path:
 def save_record(record: PersistedRecord, table_name: str | None = None) -> str:
     """Save a persisted record to TinyDB.
 
-    Args:
-        record: Validated record to save
-        table_name: Optional table name (defaults to schema hash from record)
-
     Returns:
         Record ID of saved record
 
@@ -69,10 +65,6 @@ def save_record(record: PersistedRecord, table_name: str | None = None) -> str:
 
 def export_record(record_id: str, table_name: str | None = None) -> dict[str, Any]:
     """Export a record as JSON-serializable dictionary.
-
-    Args:
-        record_id: Record identifier
-        table_name: Optional table name
 
     Returns:
         JSON-serializable record data
