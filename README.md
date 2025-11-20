@@ -156,18 +156,18 @@ Or create a ZIP/TAR archive of documents.
 
 1. Open `http://localhost:7860` in your browser
 2. **Upload Schema**: Upload your schema file (JSON or Python)
-3. **Select Schema Type**: Choose "JSON Schema" or "Pydantic Model" (auto-detected from file extension)
-4. **Upload Corpus**: Either:
+   - Schema type is automatically inferred from the file extension (`.json` for JSON Schema, `.py` for Pydantic models)
+3. **Upload Corpus**: Either:
    - Upload a ZIP/TAR archive file, or
    - Enter a directory path containing your documents
-5. **Configure Options** (optional):
+4. **Configure Options** (optional):
    - **Null policy**: How to handle empty fields
      - "Empty List" (default): `[]` for fields with no candidates
      - "Explicit Null": `[null]` for fields with no candidates
    - **Confidence threshold**: Consensus detection threshold (default: 0.75)
      - Higher values require more confidence for automatic consensus
-6. Click **"Run Extraction"**
-7. **Monitor Progress**:
+5. Click **"Run Extraction"**
+6. **Monitor Progress**:
    - Progress bar shows current stage (schema loading, corpus processing, extraction)
    - Progress messages display detailed status
    - You can cancel the operation at any time using the cancel button
