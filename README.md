@@ -89,11 +89,7 @@ pip install -e .
 ### 1. Install and Start the Application
 
 ```bash
-# Install the project (if not already done)
-make install
-
-# Start the application
-python -m ctrlf.app.server
+make demo
 ```
 
 The application will start on `http://localhost:7860`.
