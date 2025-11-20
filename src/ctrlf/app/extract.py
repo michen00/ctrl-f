@@ -153,20 +153,30 @@ def generate_example_extractions(schema: str, example_text: str) -> list[Extract
     client = genai.Client()
 
     prompt = f"""
-Use the schema and example text to create Extractions.
-Output MUST be a list of JSON objects, one per line, with "class" and "text" fields.
+Extract structured data from the input text according to the schema.
+For each field in the schema, find the actual text snippet that appears in the input text.
+
+IMPORTANT:
+- The "text" field MUST be a simple string value that appears verbatim in the input text
+- Do NOT create nested JSON structures or complex objects
+- Do NOT make up values - only extract text that actually appears in the input
+- Each extraction should be a simple key-value pair where "class" is the field name and "text" is the extracted value
+
+Output format: One JSON object per line, each with "class" and "text" fields.
 Do NOT output a single large JSON object.
 Do NOT wrap in markdown code blocks.
 
-Example Output Format:
-{{"class": "field_name", "text": "extracted value"}}
-{{"class": "another_field", "text": "another value"}}
+Example:
+{{"class": "field_name", "text": "actual text from input"}}
+{{"class": "another_field", "text": "another actual value"}}
 
 <input_text>
 {example_text}
 </input_text>
 
+<schema>
 {schema}
+</schema>
 
 Output:
 """
