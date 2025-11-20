@@ -146,32 +146,11 @@ Processes entire corpus, converting all documents to Markdown.
 
 ## Extract Module (`extract.py`)
 
-### `extract_field_candidates(field_name: str, field_type: type, field_description: str | None, markdown_content: str, doc_id: str, source_map: Dict[str, Any]) -> List[Candidate]`
+### ~~`extract_field_candidates(...)`~~ (REMOVED)
 
-Extracts candidate values for a single field from a single document.
+**Status**: This function has been removed from the codebase. It was deprecated in favor of `run_extraction`, which provides a batch processing approach that is more efficient and better aligned with the overall architecture.
 
-**Inputs**:
-
-- `field_name: str` - Name of schema field
-- `field_type: type` - Python type of field (str, int, float, date, etc.)
-- `field_description: str | None` - Optional field description from schema
-- `markdown_content: str` - Document content in Markdown
-- `doc_id: str` - Document identifier
-- `source_map: Dict[str, Any]` - Source mapping for span location
-
-**Outputs**:
-
-- `List[Candidate]` - List of candidate values with confidence scores and source references
-  - Multiple occurrences in same document: Creates separate candidates for each occurrence
-  - Each candidate has distinct source reference to enable disagreement tracking
-
-**Errors**:
-
-- Returns empty list if extraction fails (no candidates found)
-- Logs warnings for extraction errors but doesn't raise
-
-**Preconditions**: markdown_content is valid, source_map is valid
-**Postconditions**: All candidates have non-empty sources (zero fabrication)
+**Replacement**: Use `run_extraction` instead, which processes all fields across all documents in a single batch operation.
 
 ---
 

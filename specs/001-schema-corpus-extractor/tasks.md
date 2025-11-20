@@ -81,7 +81,7 @@ description: "Task list template for feature implementation"
 - [x] T024 [P] [US1] Implement PersistedRecord model in src/ctrlf/app/models.py
 - [x] T025 [US1] Implement convert_document_to_markdown function in src/ctrlf/app/ingest.py (depends on T005)
 - [x] T026 [US1] Implement process_corpus function in src/ctrlf/app/ingest.py (depends on T025)
-- [x] T027 [US1] Implement extract_field_candidates function in src/ctrlf/app/extract.py (depends on T019, T020)
+- [x] T027 [US1] Implement extract_field_candidates function in src/ctrlf/app/extract.py (depends on T019, T020) - **NOTE: This function has been removed. It was deprecated in favor of run_extraction's batch processing approach.**
 - [x] T028 [US1] Implement run_extraction function in src/ctrlf/app/extract.py (depends on T027)
 - [x] T029 [US1] Implement normalize_value function in src/ctrlf/app/aggregate.py (depends on T020)
 - [x] T030 [US1] Implement deduplicate_candidates function in src/ctrlf/app/aggregate.py (depends on T020, T029)

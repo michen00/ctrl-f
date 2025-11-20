@@ -62,8 +62,6 @@ class TestNormalizeValue:
         normalized = normalize_value(value, float)  # Schema type is float
         assert isinstance(normalized, float)
         assert normalized == 3.14
-        # Should NOT be normalized as a string
-        assert not isinstance(normalized, str)  # type: ignore[unreachable]
 
 
 class TestDeduplicateCandidates:
