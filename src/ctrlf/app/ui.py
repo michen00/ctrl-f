@@ -29,6 +29,7 @@ from ctrlf.app.ingest import process_corpus
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import (
     Candidate,
+    ExtractionResult,
     PersistedRecord,
     PrePromptInstrumentation,
     Resolution,
@@ -46,8 +47,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from pydantic import BaseModel
-
-    from ctrlf.app.models import ExtractionResult
 
 
 logger = get_logger(__name__)
