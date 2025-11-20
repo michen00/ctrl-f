@@ -579,7 +579,7 @@ def _resolve_and_validate_path(path_input: str | None) -> str:
     return str(resolved_path)
 
 
-def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
+def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
     """Create Gradio interface for schema and corpus upload.
 
     Returns:
@@ -912,7 +912,6 @@ def create_upload_interface() -> gr.Blocks:  # noqa: PLR0915
 
 def create_review_interface(  # noqa: PLR0915, C901
     extraction_result: ExtractionResult,
-    extraction_result_state: gr.State,
 ) -> gr.Blocks:
     """Create Gradio interface for reviewing and resolving candidates.
 
@@ -1475,24 +1474,9 @@ def create_review_interface(  # noqa: PLR0915, C901
                 )
 
         # Store extraction result in a state component for the save function
-        extraction_result_state_review = gr.State()
-
-        def update_extraction_state(
-            extraction_result: ExtractionResult | None,
-        ) -> ExtractionResult | None:
-            """Update the extraction result state for the review interface.
-
-            Returns:
-                The extraction result
-            """
-            return extraction_result
-
-        # Update state when extraction completes
-        extraction_result_state.change(
-            fn=update_extraction_state,
-            inputs=[extraction_result_state],
-            outputs=[extraction_result_state_review],
-        )
+        # Initialize with the extraction_result parameter value since State components
+        # only fire .change() events when written to by callbacks, not on initialization
+        extraction_result_state_review = gr.State(value=extraction_result)
 
         save_button.click(
             fn=save_resolved_record,

@@ -106,6 +106,54 @@ def _extract_location_from_source_map(
     return f"char-range [{span_start}:{span_end}]"
 
 
+def _extract_response_metadata(
+    response: Any,  # noqa: ANN401
+) -> tuple[int | None, int | None, str | None, dict[str, object]]:
+    """Extract metadata from a Google GenAI response.
+
+    Args:
+        response: The response object from Google GenAI
+
+    Returns:
+        Tuple of (prompt_tokens, completion_tokens, finish_reason, response_metadata)
+    """
+    prompt_tokens = None
+    completion_tokens = None
+    finish_reason = None
+    response_metadata: dict[str, object] = {}
+
+    # Try to extract token usage
+    if hasattr(response, "usage_metadata"):
+        usage = response.usage_metadata
+        if usage is not None:
+            if hasattr(usage, "prompt_token_count"):
+                prompt_tokens = usage.prompt_token_count
+            if hasattr(usage, "candidates_token_count"):
+                completion_tokens = usage.candidates_token_count
+            if hasattr(usage, "total_token_count"):
+                response_metadata["total_tokens"] = usage.total_token_count
+
+    # Try to extract finish reason from candidates
+    if hasattr(response, "candidates") and response.candidates:
+        candidate = response.candidates[0]
+        if hasattr(candidate, "finish_reason"):
+            finish_reason = str(candidate.finish_reason)
+        if hasattr(candidate, "safety_ratings"):
+            safety_ratings = candidate.safety_ratings
+            if safety_ratings is not None:
+                response_metadata["safety_ratings"] = [
+                    {
+                        "category": str(r.category) if hasattr(r, "category") else None,
+                        "probability": str(r.probability)
+                        if hasattr(r, "probability")
+                        else None,
+                    }
+                    for r in safety_ratings
+                ]
+
+    return prompt_tokens, completion_tokens, finish_reason, response_metadata
+
+
 def generate_synthetic_example(schema: str) -> tuple[str, PrePromptInteraction]:
     """Generate synthetic example text based on the schema using Google Gen AI.
 
@@ -136,36 +184,9 @@ Example text:
     completion_text = response.text if response.text else ""
 
     # Extract metadata from response
-    prompt_tokens = None
-    completion_tokens = None
-    finish_reason = None
-    response_metadata: dict[str, object] = {}
-
-    # Try to extract token usage
-    if hasattr(response, "usage_metadata"):
-        usage = response.usage_metadata
-        if hasattr(usage, "prompt_token_count"):
-            prompt_tokens = usage.prompt_token_count
-        if hasattr(usage, "candidates_token_count"):
-            completion_tokens = usage.candidates_token_count
-        if hasattr(usage, "total_token_count"):
-            response_metadata["total_tokens"] = usage.total_token_count
-
-    # Try to extract finish reason from candidates
-    if hasattr(response, "candidates") and response.candidates:
-        candidate = response.candidates[0]
-        if hasattr(candidate, "finish_reason"):
-            finish_reason = str(candidate.finish_reason)
-        if hasattr(candidate, "safety_ratings"):
-            response_metadata["safety_ratings"] = [
-                {
-                    "category": str(r.category) if hasattr(r, "category") else None,
-                    "probability": str(r.probability)
-                    if hasattr(r, "probability")
-                    else None,
-                }
-                for r in candidate.safety_ratings
-            ]
+    prompt_tokens, completion_tokens, finish_reason, response_metadata = (
+        _extract_response_metadata(response)
+    )
 
     instrumentation = PrePromptInteraction(
         step_name="generate_synthetic_example",
@@ -231,36 +252,9 @@ Output:
     response_text = response.text or ""
 
     # Extract metadata from response
-    prompt_tokens = None
-    completion_tokens = None
-    finish_reason = None
-    response_metadata: dict[str, object] = {}
-
-    # Try to extract token usage
-    if hasattr(response, "usage_metadata"):
-        usage = response.usage_metadata
-        if hasattr(usage, "prompt_token_count"):
-            prompt_tokens = usage.prompt_token_count
-        if hasattr(usage, "candidates_token_count"):
-            completion_tokens = usage.candidates_token_count
-        if hasattr(usage, "total_token_count"):
-            response_metadata["total_tokens"] = usage.total_token_count
-
-    # Try to extract finish reason from candidates
-    if hasattr(response, "candidates") and response.candidates:
-        candidate = response.candidates[0]
-        if hasattr(candidate, "finish_reason"):
-            finish_reason = str(candidate.finish_reason)
-        if hasattr(candidate, "safety_ratings"):
-            response_metadata["safety_ratings"] = [
-                {
-                    "category": str(r.category) if hasattr(r, "category") else None,
-                    "probability": str(r.probability)
-                    if hasattr(r, "probability")
-                    else None,
-                }
-                for r in candidate.safety_ratings
-            ]
+    prompt_tokens, completion_tokens, finish_reason, response_metadata = (
+        _extract_response_metadata(response)
+    )
 
     if response_text:
         text_to_parse = response_text.strip()
