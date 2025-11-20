@@ -41,7 +41,8 @@ def validate_json_schema(schema_json: str) -> dict[str, Any]:
 
     try:
         jsonschema.Draft7Validator.check_schema(schema)
-    except (jsonschema.ValidationError, jsonschema.exceptions.SchemaError) as e:
+    except Exception as e:
+        # Catch both ValidationError and SchemaError from jsonschema
         msg = f"Invalid JSON Schema: {e}"
         raise SchemaError(msg) from e
 
@@ -196,6 +197,85 @@ def import_pydantic_model(code: str) -> type[BaseModel]:
     return model_class
 
 
+def _check_nested_structure(
+    field_name: str,
+    field_type: Any,  # noqa: ANN401
+) -> None:
+    """Check if field type contains nested structures (not allowed in v0).
+
+    Args:
+        field_name: Name of the field being checked
+        field_type: Type annotation to check
+
+    Raises:
+        SchemaError: If nested structures are detected
+    """
+    # Check if type is a BaseModel subclass (nested object)
+    if isinstance(field_type, type) and issubclass(field_type, BaseModel):
+        msg = f"Nested objects not supported in v0: field '{field_name}'"
+        raise SchemaError(msg)
+
+    # Check if type is a List of BaseModel (nested array of objects)
+    origin = get_origin(field_type)
+    if origin is list:
+        args = get_args(field_type)
+        if args:
+            item_type = args[0]
+            if isinstance(item_type, type) and issubclass(item_type, BaseModel):
+                msg = (
+                    f"Nested arrays of objects not supported in v0: "
+                    f"field '{field_name}'"
+                )
+                raise SchemaError(msg)
+
+
+def _convert_to_extended_type(
+    field_name: str,
+    original_type: Any,  # noqa: ANN401
+) -> Any:  # noqa: ANN401
+    """Convert a field type to its extended array form.
+
+    Args:
+        field_name: Name of the field
+        original_type: Original type annotation
+
+    Returns:
+        Extended type (List[type] or List[type] | None)
+
+    Raises:
+        SchemaError: If nested structures are detected
+    """
+    origin = get_origin(original_type)
+
+    # If already a list, keep it as is
+    if origin is list:
+        return original_type
+
+    # Handle Optional/Union types
+    if origin is Union or origin is type(None):
+        args = get_args(original_type)
+        # Filter out None
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        if non_none_args:
+            # Take the first non-None type
+            base_type = non_none_args[0]
+            # Re-validate base_type for nested structures
+            # (Union/Optional can wrap BaseModel)
+            _check_nested_structure(field_name, base_type)
+            # Check if base_type is a List of BaseModel
+            base_origin = get_origin(base_type)
+            if base_origin is list:
+                base_args = get_args(base_type)
+                if base_args:
+                    base_item_type = base_args[0]
+                    _check_nested_structure(field_name, base_item_type)
+            return list[base_type] | None  # type: ignore[valid-type]
+        return list[str] | None
+
+    # Simple type - convert to List[type]
+    return list[original_type]
+
+
 def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
     """Create Extended Schema by coercing all fields to arrays.
 
@@ -215,45 +295,10 @@ def extend_schema(model_cls: type[BaseModel]) -> type[BaseModel]:
         original_type = field_info.annotation
 
         # Check for nested structures (v0 limitation)
-        # Check if type is a BaseModel subclass (nested object)
-        if isinstance(original_type, type) and issubclass(original_type, BaseModel):
-            msg = f"Nested objects not supported in v0: field '{field_name}'"
-            raise SchemaError(msg)
-
-        # Check if type is a List of BaseModel (nested array of objects)
-        origin = get_origin(original_type)
-        if origin is list:
-            args = get_args(original_type)
-            if args:
-                item_type = args[0]
-                if isinstance(item_type, type) and issubclass(item_type, BaseModel):
-                    msg = (
-                        f"Nested arrays of objects not supported in v0: "
-                        f"field '{field_name}'"
-                    )
-                    raise SchemaError(msg)
+        _check_nested_structure(field_name, original_type)
 
         # Convert type to List[type]
-        # If already a list, keep it as is
-        origin = get_origin(original_type)
-        extended_type: Any
-        if origin is list:
-            # Already a list, keep it
-            extended_type = original_type
-        # Convert to List[type]
-        # Handle Optional types
-        elif origin is Union or origin is type(None):
-            args = get_args(original_type)
-            # Filter out None
-            non_none_args = [arg for arg in args if arg is not type(None)]
-            if non_none_args:
-                # Take the first non-None type
-                base_type = non_none_args[0]
-                extended_type = list[base_type] | None  # type: ignore[valid-type]
-            else:
-                extended_type = list[str] | None
-        else:
-            extended_type = list[original_type]  # type: ignore[valid-type]
+        extended_type = _convert_to_extended_type(field_name, original_type)
 
         # Preserve default value if present, wrapping in list for array types
         # Check for PydanticUndefined (no default) or Ellipsis (required field)

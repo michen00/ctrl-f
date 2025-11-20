@@ -5,7 +5,7 @@ from __future__ import annotations
 __all__ = "export_record", "get_storage_path", "save_record"
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from tinydb import Query, TinyDB  # type: ignore[import-not-found]
 
@@ -91,7 +91,7 @@ def export_record(record_id: str, table_name: str | None = None) -> dict[str, An
             db.close()
 
             if results:
-                return results[0]  # type: ignore[no-any-return]
+                return cast("dict[str, Any]", results[0])
 
         msg = f"Record not found: {record_id}"
         raise KeyError(msg)
@@ -114,4 +114,4 @@ def export_record(record_id: str, table_name: str | None = None) -> dict[str, An
         msg = f"Record not found: {record_id}"
         raise KeyError(msg)
 
-    return results[0]  # type: ignore[no-any-return]
+    return cast("dict[str, Any]", results[0])

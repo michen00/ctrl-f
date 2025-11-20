@@ -171,7 +171,7 @@ description: "Task list template for feature implementation"
 - [x] T069 [P] Add field filtering (unresolved/flagged) to review interface in src/ctrlf/app/ui.py
 - [x] T070 [P] Update README.md with installation and usage instructions
 - [x] T071 [P] Add docstrings to all public functions and classes
-- [ ] T072 Code cleanup and refactoring
+- [x] T072 Code cleanup and refactoring
 - [ ] T073 [P] Performance optimization across all modules
 - [x] T074 [P] Additional unit tests for edge cases in tests/unit/ (multiple occurrences per document, missing location fallback, special characters/encoding/images/tables, SC-003 recall metrics, SC-004 validation pass rate)
 - [x] T075 Run quickstart.md validation
