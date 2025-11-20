@@ -172,6 +172,67 @@ class TestDeduplicateCandidates:
             for i in range(len(deduplicated) - 1):
                 assert deduplicated[i].confidence >= deduplicated[i + 1].confidence
 
+    def test_deduplicate_transitive_similarity(self) -> None:
+        """Test that transitive similarity is handled correctly.
+
+        If A is similar to B, and B is similar to C, but A is not similar to C,
+        all three should still be grouped together (single-linkage clustering).
+        """
+        source1 = SourceRef(
+            doc_id="doc1",
+            path="doc1.txt",
+            location="line 1",
+            snippet="Value A",
+        )
+        source2 = SourceRef(
+            doc_id="doc2",
+            path="doc2.txt",
+            location="line 1",
+            snippet="Value B",
+        )
+        source3 = SourceRef(
+            doc_id="doc3",
+            path="doc3.txt",
+            location="line 1",
+            snippet="Value C",
+        )
+
+        # Create candidates where:
+        # - "John Smith" is similar to "John Smyth" (high similarity)
+        # - "John Smyth" is similar to "Jon Smyth" (high similarity)
+        # - "John Smith" is NOT similar to "Jon Smyth" (lower similarity)
+        # All three should be grouped together due to transitive similarity
+        candidates = [
+            Candidate(
+                value="John Smith",
+                confidence=0.9,
+                sources=[source1],
+                normalized=None,
+            ),
+            Candidate(
+                value="John Smyth",  # Similar to "John Smith" and "Jon Smyth"
+                confidence=0.85,
+                sources=[source2],
+                normalized=None,
+            ),
+            Candidate(
+                value="Jon Smyth",  # Similar to "John Smyth" but not "John Smith"
+                confidence=0.8,
+                sources=[source3],
+                normalized=None,
+            ),
+        ]
+
+        # Use a threshold that will match "John Smith" to "John Smyth" and
+        # "John Smyth" to "Jon Smyth", but not "John Smith" to "Jon Smyth"
+        # The exact threshold depends on fuzz.ratio, but 85% should work
+        deduplicated = deduplicate_candidates(candidates, similarity_threshold=0.85)
+
+        # All three should be grouped together due to transitive similarity
+        assert len(deduplicated) == 1
+        # Merged candidate should have all three sources
+        assert len(deduplicated[0].sources) == 3
+
 
 class TestDetectConsensus:
     """Test consensus detection."""

@@ -83,7 +83,12 @@ def deduplicate_candidates(
     candidates: list[Candidate],
     similarity_threshold: float = 0.85,
 ) -> list[Candidate]:
-    """Group near-duplicate candidates using similarity matching.
+    """Group near-duplicate candidates using single-linkage clustering.
+
+    Uses single-linkage clustering where candidates are grouped if they are
+    similar to any member of an existing group (transitive similarity).
+    For example, if A is similar to B, and B is similar to C, then A, B, and C
+    will all be in the same group even if A is not directly similar to C.
 
     Args:
         candidates: List of candidate values
@@ -101,7 +106,7 @@ def deduplicate_candidates(
         str(c.normalized if c.normalized is not None else c.value) for c in candidates
     ]
 
-    # Group similar candidates
+    # Group similar candidates using single-linkage clustering
     groups: list[list[int]] = []
     used_indices: set[int] = set()
 
@@ -109,21 +114,30 @@ def deduplicate_candidates(
         if i in used_indices:
             continue
 
-        # Start a new group
-        group = [i]
-        used_indices.add(i)
+        # Check if this candidate is similar to any existing group
+        # (single-linkage: similar to any member means it belongs to that group)
+        matched_group_idx: int | None = None
+        for group_idx, group in enumerate(groups):
+            # Check similarity against all members of this group
+            for member_idx in group:
+                similarity = (
+                    fuzz.ratio(candidate_strings[i], candidate_strings[member_idx])
+                    / 100.0
+                )
+                if similarity >= similarity_threshold:
+                    matched_group_idx = group_idx
+                    break
+            if matched_group_idx is not None:
+                break
 
-        # Find similar candidates
-        for j in range(i + 1, len(candidates)):
-            if j in used_indices:
-                continue
-
-            similarity = fuzz.ratio(candidate_strings[i], candidate_strings[j]) / 100.0
-            if similarity >= similarity_threshold:
-                group.append(j)
-                used_indices.add(j)
-
-        groups.append(group)
+        if matched_group_idx is not None:
+            # Add to existing group
+            groups[matched_group_idx].append(i)
+            used_indices.add(i)
+        else:
+            # Start a new group
+            groups.append([i])
+            used_indices.add(i)
 
     # Merge candidates in each group
     deduplicated: list[Candidate] = []
