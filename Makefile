@@ -60,6 +60,10 @@ help: ## Show this help message
 	@echo "  $(YELLOW)DEBUG$(_COLOR) = true|false    Set to true to enable debug output (default: false)"
 	@echo "  $(YELLOW)VERBOSE$(_COLOR) = true|false  Set to true to enable verbose output (default: false)"
 
+.PHONY: demo
+demo: install ## Run the demo server
+	$(UV) run python -m ctrlf.app.server
+
 .PHONY: install
 install: build/install-python-versions ## Install the project
 	$(UV) sync
