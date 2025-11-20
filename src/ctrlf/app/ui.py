@@ -267,6 +267,25 @@ def _create_corpus_progress_callback(
     return corpus_progress_callback
 
 
+def _get_directory_path(file_input: str | list[str] | None) -> str | None:
+    """Extract directory path from file input.
+
+    Handles both string paths and lists of file paths (from directory selection).
+
+    Args:
+        file_input: File path string, list of file paths, or None
+
+    Returns:
+        Directory path as string, or None if input is None/empty
+    """
+    if file_input:
+        if isinstance(file_input, str):
+            path = Path(file_input)
+            return str(path.parent) if path.is_file() else str(path)
+        return str(Path(file_input[0]).parent)
+    return None
+
+
 def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
     """Create Gradio interface for schema and corpus upload.
 
@@ -299,9 +318,10 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                     file_types=[".zip", ".tar", ".tar.gz"],
                     type="filepath",
                 )
-                corpus_dir = gr.Textbox(
+                corpus_dir = gr.File(
                     label="Or Corpus Directory Path",
-                    placeholder="/path/to/corpus",
+                    file_count="directory",
+                    type="filepath",
                 )
 
         with gr.Row():
@@ -344,7 +364,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
-            corpus_dir_path: str | None,
+            corpus_dir_path: str | list[str] | None,
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
@@ -431,8 +451,13 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                         # Clean up temp directory after processing
                         shutil.rmtree(tmpdir, ignore_errors=True)
                 elif corpus_dir_path:
-                    if not Path(corpus_dir_path).exists():
-                        msg = f"Corpus directory does not exist: {corpus_dir_path}"
+                    # Extract directory path from file input
+                    dir_path = _get_directory_path(corpus_dir_path)
+                    if not dir_path:
+                        msg = "Corpus directory path is invalid"
+                        raise ValueError(msg)  # noqa: TRY301
+                    if not Path(dir_path).exists():
+                        msg = f"Corpus directory does not exist: {dir_path}"
                         raise ValueError(msg)  # noqa: TRY301
 
                     corpus_progress_callback = _create_corpus_progress_callback(
@@ -441,7 +466,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
                     )
 
                     corpus_docs = process_corpus(
-                        corpus_dir_path,
+                        dir_path,
                         progress_callback=corpus_progress_callback,
                     )
                 else:
@@ -536,7 +561,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901 PLR0915
             schema_file_path: str | None,
             schema_type_str: str,
             corpus_file_path: str | None,
-            corpus_dir_path: str | None,
+            corpus_dir_path: str | list[str] | None,
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
