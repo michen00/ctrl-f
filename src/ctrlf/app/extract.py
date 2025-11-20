@@ -179,7 +179,7 @@ Example:
 </schema>
 
 Output:
-"""
+"""  # noqa: E501
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
