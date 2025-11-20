@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
+from langextract.data import AnnotatedDocument, Extraction
 from pydantic import BaseModel
 
 from ctrlf.app.extract import (
@@ -16,8 +19,24 @@ from ctrlf.app.models import Candidate, ExtractionResult, SourceRef
 class TestExtractFieldCandidates:
     """Test field candidate extraction."""
 
-    def test_extract_string_field(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_extract_string_field(self, mock_extract: MagicMock) -> None:
         """Test extracting a string field from markdown content."""
+        # Mock extract return value
+        # Use a Mock object instead of Extraction to allow arbitrary attributes
+        extraction = MagicMock(spec=Extraction)
+        extraction.extraction_class = "email"
+        extraction.extraction_text = "john.doe@example.com"
+        extraction.char_start = 9
+        extraction.char_end = 29
+        extraction.confidence = 0.95
+
+        mock_doc = AnnotatedDocument(
+            text="Contact: john.doe@example.com for inquiries.",
+            extractions=[extraction],
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = "Contact: john.doe@example.com for inquiries."
         source_map: dict[str, object] = {}
         doc_id = "test_doc_1"
@@ -38,9 +57,30 @@ class TestExtractFieldCandidates:
             assert len(candidate.sources) > 0
             assert candidate.confidence >= 0.0
             assert candidate.confidence <= 1.0
+            assert candidate.value == "john.doe@example.com"
 
-    def test_extract_multiple_occurrences(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_extract_multiple_occurrences(self, mock_extract: MagicMock) -> None:
         """Test that multiple occurrences create separate candidates."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "test@example.com"
+        e1.char_start = 7
+        e1.char_end = 23
+
+        e2 = MagicMock(spec=Extraction)
+        e2.extraction_class = "email"
+        e2.extraction_text = "test@example.com"
+        e2.char_start = 38
+        e2.char_end = 54
+
+        mock_doc = AnnotatedDocument(
+            text="Email: test@example.com. Also contact test@example.com.",
+            extractions=[e1, e2],
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = "Email: test@example.com. Also contact test@example.com."
         source_map: dict[str, object] = {}
         doc_id = "test_doc_1"
@@ -55,11 +95,20 @@ class TestExtractFieldCandidates:
         )
 
         # Should create separate candidates for each occurrence
-        # (exact behavior depends on langextract, but should handle multiple)
         assert isinstance(candidates, list)
+        assert len(candidates) == 2
+        assert candidates[0].value == "test@example.com"
+        assert candidates[1].value == "test@example.com"
 
-    def test_extract_returns_empty_on_no_match(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_extract_returns_empty_on_no_match(self, mock_extract: MagicMock) -> None:
         """Test that empty list is returned when no candidates found."""
+        # Mock extract return value
+        mock_doc = AnnotatedDocument(
+            text="This document has no email addresses.", extractions=[]
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = "This document has no email addresses."
         source_map: dict[str, object] = {}
         doc_id = "test_doc_1"
@@ -75,8 +124,22 @@ class TestExtractFieldCandidates:
 
         assert candidates == []
 
-    def test_all_candidates_have_sources(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_all_candidates_have_sources(self, mock_extract: MagicMock) -> None:
         """Test that all candidates have non-empty sources (zero fabrication)."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "name"
+        e1.extraction_text = "John Doe"
+        e1.char_start = 6
+        e1.char_end = 14
+
+        mock_doc = AnnotatedDocument(
+            text="Name: John Doe, Email: john@example.com",
+            extractions=[e1],
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = "Name: John Doe, Email: john@example.com"
         source_map: dict[str, object] = {}
         doc_id = "test_doc_1"
@@ -97,11 +160,42 @@ class TestExtractFieldCandidates:
                 assert source.doc_id == doc_id
 
 
+@patch("ctrlf.app.extract.generate_synthetic_example")
+@patch("ctrlf.app.extract.generate_example_extractions")
+@patch("ctrlf.app.extract.extract")
 class TestRunExtraction:
     """Test full extraction workflow."""
 
-    def test_run_extraction_creates_field_results(self) -> None:
+    def test_run_extraction_creates_field_results(
+        self,
+        mock_extract: MagicMock,
+        mock_gen_extractions: MagicMock,
+        mock_gen_example: MagicMock,
+    ) -> None:
         """Test that extraction creates FieldResult for each schema field."""
+        # Mock setup
+        mock_gen_example.return_value = "Example text"
+        mock_gen_extractions.return_value = []
+
+        # Mock extraction results
+        # We need to return a document with extractions for both fields
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "name"
+        e1.extraction_text = "Alice"
+        e1.char_start = 6
+        e1.char_end = 11
+
+        e2 = MagicMock(spec=Extraction)
+        e2.extraction_class = "email"
+        e2.extraction_text = "alice@example.com"
+        e2.char_start = 20
+        e2.char_end = 37
+
+        mock_doc = AnnotatedDocument(
+            text="Name: Alice, Email: alice@example.com",
+            extractions=[e1, e2],
+        )
+        mock_extract.return_value = mock_doc
 
         # Create a simple Extended Schema model
         class TestModel(BaseModel):
@@ -124,8 +218,27 @@ class TestRunExtraction:
         assert result.created_at
         assert result.schema_version
 
-    def test_run_extraction_handles_errors_gracefully(self) -> None:
+        # Verify our mocks were called
+        mock_gen_example.assert_called_once()
+        mock_gen_extractions.assert_called_once()
+        mock_extract.assert_called()
+
+    def test_run_extraction_handles_errors_gracefully(
+        self,
+        mock_extract: MagicMock,
+        mock_gen_extractions: MagicMock,
+        mock_gen_example: MagicMock,
+    ) -> None:
         """Test that extraction continues on individual field/document errors."""
+        # Mock setup
+        mock_gen_example.return_value = "Example text"
+        mock_gen_extractions.return_value = []
+
+        # Mock extraction to fail for first doc, succeed for second (empty)
+        mock_doc_success = AnnotatedDocument(text="", extractions=[])
+
+        # Side effect: first call raises Exception, second returns empty doc
+        mock_extract.side_effect = [Exception("Extraction failed"), mock_doc_success]
 
         class TestModel(BaseModel):
             name: list[str]
@@ -145,6 +258,7 @@ class TestRunExtraction:
         # Should not raise, should continue processing
         result = run_extraction(TestModel, corpus_docs)
         assert isinstance(result, ExtractionResult)
+        assert len(result.results) == 2  # Results for fields exist even if empty
 
 
 class TestExtractSnippet:

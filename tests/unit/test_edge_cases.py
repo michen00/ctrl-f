@@ -5,7 +5,10 @@ from __future__ import annotations
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
+from unittest.mock import MagicMock, patch
 
+from langextract.data import AnnotatedDocument, Extraction
 from pydantic import BaseModel
 
 from ctrlf.app.aggregate import aggregate_field_results
@@ -17,8 +20,36 @@ from ctrlf.app.models import Candidate, PersistedRecord, Resolution, SourceRef
 class TestMultipleOccurrencesPerDocument:
     """Test handling of multiple occurrences of the same value in a document."""
 
-    def test_multiple_occurrences_create_separate_candidates(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_multiple_occurrences_create_separate_candidates(
+        self, mock_extract: MagicMock
+    ) -> None:
         """Test multiple occurrences create separate candidates with different locations."""  # noqa: E501
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "john@example.com"
+        e1.char_start = 9
+        e1.char_end = 25
+
+        e2 = MagicMock(spec=Extraction)
+        e2.extraction_class = "email"
+        e2.extraction_text = "john@example.com"
+        e2.char_start = 30
+        e2.char_end = 46
+
+        e3 = MagicMock(spec=Extraction)
+        e3.extraction_class = "email"
+        e3.extraction_text = "john@example.com"
+        e3.char_start = 52
+        e3.char_end = 68
+
+        mock_doc = AnnotatedDocument(
+            text="Contact: john@example.com... john@example.com... john@example.com",
+            extractions=[e1, e2, e3],
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = (
             "Contact: john@example.com for inquiries. "
             "Also reach out to john@example.com for support. "
@@ -42,6 +73,7 @@ class TestMultipleOccurrencesPerDocument:
         # Should create separate candidates for each occurrence
         # (exact count depends on langextract, but should handle multiple)
         assert isinstance(candidates, list)
+        assert len(candidates) == 3
         # Each candidate should have unique location information
         if len(candidates) > 1:
             locations = [c.sources[0].location for c in candidates]
@@ -90,8 +122,24 @@ class TestMultipleOccurrencesPerDocument:
 class TestMissingLocationFallback:
     """Test fallback behavior when location information is missing."""
 
-    def test_missing_location_fallback_to_char_range(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_missing_location_fallback_to_char_range(
+        self, mock_extract: MagicMock
+    ) -> None:
         """Test that missing location falls back to char-range format."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "test@example.com"
+        e1.char_start = 7
+        e1.char_end = 23
+
+        mock_doc = AnnotatedDocument(
+            text="Email: test@example.com",
+            extractions=[e1],
+        )
+        mock_extract.return_value = mock_doc
+
         source_map: dict[str, object] = {
             "file_path": "test.txt",
             "file_name": "test.txt",
@@ -132,8 +180,22 @@ class TestMissingLocationFallback:
 class TestSpecialCharactersAndEncoding:
     """Test handling of special characters, encoding, and edge cases."""
 
-    def test_special_characters_in_content(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_special_characters_in_content(self, mock_extract: MagicMock) -> None:
         """Test extraction with special characters in content."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "test+tag@example.com"
+        e1.char_start = 7
+        e1.char_end = 27
+
+        mock_doc = AnnotatedDocument(
+            text="Email: test+tag@example.com",
+            extractions=[e1],
+        )
+        mock_extract.return_value = mock_doc
+
         # Test with various special characters
         markdown = (
             "Name: José García\n"
@@ -159,9 +221,24 @@ class TestSpecialCharactersAndEncoding:
         assert isinstance(candidates, list)
         for candidate in candidates:
             assert isinstance(candidate.value, str)
+            assert candidate.value == "test+tag@example.com"
 
-    def test_unicode_characters(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_unicode_characters(self, mock_extract: MagicMock) -> None:
         """Test handling of Unicode characters."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "name"
+        e1.extraction_text = "山田太郎"
+        e1.char_start = 6
+        e1.char_end = 10
+
+        mock_doc = AnnotatedDocument(
+            text="Name: 山田太郎 (Yamada Taro)",
+            extractions=[e1],
+        )
+        mock_extract.return_value = mock_doc
+
         markdown = (
             "Name: 山田太郎 (Yamada Taro)\n"
             "Email: test@example.com\n"
@@ -181,6 +258,8 @@ class TestSpecialCharactersAndEncoding:
 
         # Should handle Unicode characters
         assert isinstance(candidates, list)
+        assert len(candidates) > 0
+        assert candidates[0].value == "山田太郎"
 
     def test_encoding_handling_in_document_conversion(self) -> None:
         """Test that document conversion handles different encodings."""
@@ -203,8 +282,28 @@ class TestSpecialCharactersAndEncoding:
 class TestImagesAndTables:
     """Test handling of images and tables in documents."""
 
-    def test_extraction_with_table_content(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_extraction_with_table_content(self, mock_extract: MagicMock) -> None:
         """Test extraction when content is in table format."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "alice@example.com"
+        e1.char_start = 10
+        e1.char_end = 27
+
+        e2 = MagicMock(spec=Extraction)
+        e2.extraction_class = "email"
+        e2.extraction_text = "bob@example.com"
+        e2.char_start = 30
+        e2.char_end = 45
+
+        mock_doc = AnnotatedDocument(
+            text="| Alice | alice@example.com |",
+            extractions=[e1, e2],
+        )
+        mock_extract.return_value = mock_doc
+
         # Markdown table format
         markdown = (
             "| Name | Email |\n"
@@ -226,9 +325,30 @@ class TestImagesAndTables:
 
         # Should extract from table content
         assert isinstance(candidates, list)
+        assert len(candidates) >= 1
 
-    def test_extraction_with_image_alt_text(self) -> None:
+    @patch("ctrlf.app.extract.extract")
+    def test_extraction_with_image_alt_text(self, mock_extract: MagicMock) -> None:
         """Test extraction when content might be in image alt text."""
+        # Mock extract return value
+        e1 = MagicMock(spec=Extraction)
+        e1.extraction_class = "email"
+        e1.extraction_text = "john@example.com"
+        e1.char_start = 23
+        e1.char_end = 39
+
+        e2 = MagicMock(spec=Extraction)
+        e2.extraction_class = "email"
+        e2.extraction_text = "test@example.com"
+        e2.char_start = 50
+        e2.char_end = 66
+
+        mock_doc = AnnotatedDocument(
+            text="![Contact information: john@example.com](contact.png)",
+            extractions=[e1, e2],
+        )
+        mock_extract.return_value = mock_doc
+
         # Markdown with image (alt text might contain extractable info)
         markdown = (
             "![Contact information: john@example.com](contact.png)\n"
@@ -248,13 +368,63 @@ class TestImagesAndTables:
 
         # Should extract from markdown content including alt text
         assert isinstance(candidates, list)
+        assert len(candidates) >= 1
 
 
+@patch("ctrlf.app.extract.generate_synthetic_example")
+@patch("ctrlf.app.extract.generate_example_extractions")
+@patch("ctrlf.app.extract.extract")
 class TestSC003RecallMetrics:
     """Test SC-003: Extraction identifies at least 80% of schema fields in documents."""
 
-    def test_recall_metric_calculation(self) -> None:
+    def test_recall_metric_calculation(
+        self,
+        mock_extract: MagicMock,
+        mock_gen_extractions: MagicMock,
+        mock_gen_example: MagicMock,
+    ) -> None:
         """Test that recall can be calculated for extraction results."""
+        # Mock setup
+        mock_gen_example.return_value = "Example"
+        mock_gen_extractions.return_value = []
+
+        # Mock return values with side effect to simulate different docs
+        def recall_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
+            text = kwargs.get("text_or_documents", "")
+            extractions = []
+            if "Alice" in text:
+                e1 = MagicMock(spec=Extraction)
+                e1.extraction_class = "name"
+                e1.extraction_text = "Alice Smith"
+                e2 = MagicMock(spec=Extraction)
+                e2.extraction_class = "email"
+                e2.extraction_text = "alice@example.com"
+                e3 = MagicMock(spec=Extraction)
+                e3.extraction_class = "phone"
+                e3.extraction_text = "555-1234"
+                e4 = MagicMock(spec=Extraction)
+                e4.extraction_class = "address"
+                e4.extraction_text = "123 Main St"
+                extractions.extend([e1, e2, e3, e4])
+            elif "Bob" in text:
+                e1 = MagicMock(spec=Extraction)
+                e1.extraction_class = "name"
+                e1.extraction_text = "Bob Jones"
+                e2 = MagicMock(spec=Extraction)
+                e2.extraction_class = "email"
+                e2.extraction_text = "bob@example.com"
+                e3 = MagicMock(spec=Extraction)
+                e3.extraction_class = "phone"
+                e3.extraction_text = "555-5678"
+                e4 = MagicMock(spec=Extraction)
+                e4.extraction_class = "company"
+                e4.extraction_text = "Acme Corp"
+                extractions.extend([e1, e2, e3, e4])
+            return AnnotatedDocument(
+                text=text, extractions=cast("list[Extraction]", extractions)
+            )
+
+        mock_extract.side_effect = recall_side_effect
 
         # Create a schema with 5 fields
         class TestModel(BaseModel):
@@ -312,8 +482,46 @@ class TestSC003RecallMetrics:
                 f"Recall {recall:.2%} below 80% threshold when extraction works"
             )
 
-    def test_recall_with_partial_field_presence(self) -> None:
+    def test_recall_with_partial_field_presence(
+        self,
+        mock_extract: MagicMock,
+        mock_gen_extractions: MagicMock,
+        mock_gen_example: MagicMock,
+    ) -> None:
         """Test recall when fields are partially present across documents."""
+        # Mock setup
+        mock_gen_example.return_value = "Example"
+        mock_gen_extractions.return_value = []
+
+        def partial_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
+            text = kwargs.get("text_or_documents", "")
+            extractions = []
+            if "Field1" in text:
+                e1 = MagicMock(spec=Extraction)
+                e1.extraction_class = "field1"
+                e1.extraction_text = "value1"
+                e2 = MagicMock(spec=Extraction)
+                e2.extraction_class = "field2"
+                e2.extraction_text = "value2"
+                extractions.extend([e1, e2])
+            elif "Field3" in text:
+                e3 = MagicMock(spec=Extraction)
+                e3.extraction_class = "field3"
+                e3.extraction_text = "value3"
+                e4 = MagicMock(spec=Extraction)
+                e4.extraction_class = "field4"
+                e4.extraction_text = "value4"
+                extractions.extend([e3, e4])
+            elif "Field5" in text:
+                e5 = MagicMock(spec=Extraction)
+                e5.extraction_class = "field5"
+                e5.extraction_text = "value5"
+                extractions.extend([e5])
+            return AnnotatedDocument(
+                text=text, extractions=cast("list[Extraction]", extractions)
+            )
+
+        mock_extract.side_effect = partial_side_effect
 
         class TestModel(BaseModel):
             field1: list[str]
