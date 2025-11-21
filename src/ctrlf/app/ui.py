@@ -1318,7 +1318,145 @@ def create_review_interface(  # noqa: PLR0915, C901
         save_status = gr.Textbox(label="Save Status", interactive=False)
         export_json_output = gr.File(label="Exported JSON", visible=False)
 
-        def save_resolved_record(  # noqa: PLR0912, PLR0915
+        def _build_resolved_record(  # noqa: PLR0915
+            extraction_result: ExtractionResult,
+            *field_values: str,
+        ) -> PersistedRecord:
+            """Build a PersistedRecord from extraction result and field values.
+
+            This helper function ensures consistent record ID generation for both
+            save and export operations.
+
+            Args:
+                extraction_result: Original extraction result
+                *field_values: Field values from the form (alternating candidate/custom)
+
+            Returns:
+                PersistedRecord with consistent ID generation
+            """
+            resolutions: list[Resolution] = []
+            resolved: dict[str, object] = {}
+            provenance: dict[str, list[SourceRef]] = {}
+
+            # Parse field values
+            field_idx = 0
+            for field_result in extraction_result.results:
+                candidate_value = (
+                    field_values[field_idx] if field_idx < len(field_values) else None
+                )
+                custom_value = (
+                    field_values[field_idx + 1]
+                    if field_idx + 1 < len(field_values)
+                    else None
+                )
+                field_idx += 2
+
+                # Determine which value to use
+                chosen_value: object | None = None
+                source_doc_id: str | None = None
+                source_location: str | None = None
+                custom_input = False
+                field_provenance: list[SourceRef] = []
+
+                if custom_value and custom_value.strip():
+                    # Use custom value - validate it
+                    custom_value_stripped = custom_value.strip()
+
+                    # Basic validation: check if we can infer type from candidates
+                    if field_result.candidates:
+                        # Try to validate against candidate value type
+                        candidate_val: Any = field_result.candidates[0].value
+
+                        # Try to convert custom value to same type as candidates
+                        try:
+                            if isinstance(candidate_val, int):
+                                chosen_value = int(custom_value_stripped)
+                            elif isinstance(candidate_val, float):
+                                chosen_value = float(custom_value_stripped)
+                            elif isinstance(candidate_val, bool):
+                                # Handle boolean strings
+                                if custom_value_stripped.lower() in (
+                                    "true",
+                                    "1",
+                                    "yes",
+                                ):
+                                    chosen_value = True
+                                elif custom_value_stripped.lower() in (
+                                    "false",
+                                    "0",
+                                    "no",
+                                ):
+                                    chosen_value = False
+                                else:
+                                    msg = (
+                                        f"Invalid boolean value for field "
+                                        f"'{field_result.field_name}': "
+                                        f"{custom_value_stripped}"
+                                    )
+                                    raise ValueError(msg)  # noqa: TRY301
+                            else:
+                                # String or other types - use as-is
+                                chosen_value = custom_value_stripped
+                        except (ValueError, TypeError) as e:
+                            msg = (
+                                f"Invalid value type for field "
+                                f"'{field_result.field_name}': {e}"
+                            )
+                            raise ValueError(msg) from e
+                    else:
+                        # No candidates to infer type from - use as string
+                        chosen_value = custom_value_stripped
+
+                    custom_input = True
+                elif candidate_value:
+                    # Extract candidate index and find the candidate
+                    selection = _parse_candidate_selection(
+                        candidate_value, field_result.candidates
+                    )
+                    if selection:
+                        chosen_value = selection.value
+                        source_doc_id = selection.source_doc_id
+                        source_location = selection.source_location
+                        field_provenance = selection.provenance
+
+                if chosen_value is not None:
+                    # Create resolution
+                    resolution = Resolution(
+                        field_name=field_result.field_name,
+                        chosen_value=chosen_value,
+                        source_doc_id=source_doc_id,
+                        source_location=source_location,
+                        custom_input=custom_input,
+                    )
+                    resolutions.append(resolution)
+
+                    # Add to resolved (as array per Extended Schema)
+                    resolved[field_result.field_name] = [chosen_value]
+                    provenance[field_result.field_name] = field_provenance
+
+            # Generate consistent record ID using single format
+            # Use timestamp from extraction_result if available, otherwise current time
+            timestamp = datetime.now(UTC).isoformat()
+            record_id = slugify(f"record-{extraction_result.run_id}-{timestamp}")
+
+            # Create PersistedRecord
+            record = PersistedRecord(
+                record_id=record_id,
+                resolved=resolved,
+                provenance=provenance,
+                audit={
+                    "run_id": extraction_result.run_id,
+                    "app_version": "0.0.0",
+                    "timestamp": timestamp,
+                    "user": None,
+                    "config": {},
+                    "schema_version": extraction_result.schema_version,
+                },
+            )
+
+            return record  # noqa: RET504
+
+        def save_resolved_record(
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> str:
@@ -1332,125 +1470,8 @@ def create_review_interface(  # noqa: PLR0915, C901
                 Success message
             """
             try:
-                resolutions: list[Resolution] = []
-                resolved: dict[str, object] = {}
-                provenance: dict[str, list[SourceRef]] = {}
-
-                # Parse field values
-                field_idx = 0
-                for field_result in extraction_result.results:
-                    candidate_value = (
-                        field_values[field_idx]
-                        if field_idx < len(field_values)
-                        else None
-                    )
-                    custom_value = (
-                        field_values[field_idx + 1]
-                        if field_idx + 1 < len(field_values)
-                        else None
-                    )
-                    field_idx += 2
-
-                    # Determine which value to use
-                    chosen_value: object | None = None
-                    source_doc_id: str | None = None
-                    source_location: str | None = None
-                    custom_input = False
-                    field_provenance: list[SourceRef] = []
-
-                    if custom_value and custom_value.strip():
-                        # Use custom value - validate it
-                        custom_value_stripped = custom_value.strip()
-
-                        # Basic validation: check if we can infer type from candidates
-                        if field_result.candidates:
-                            # Try to validate against candidate value type
-                            candidate_val: Any = field_result.candidates[0].value
-
-                            # Try to convert custom value to same type as candidates
-                            try:
-                                if isinstance(candidate_val, int):
-                                    chosen_value = int(custom_value_stripped)
-                                elif isinstance(candidate_val, float):
-                                    chosen_value = float(custom_value_stripped)
-                                elif isinstance(candidate_val, bool):
-                                    # Handle boolean strings
-                                    if custom_value_stripped.lower() in (
-                                        "true",
-                                        "1",
-                                        "yes",
-                                    ):
-                                        chosen_value = True
-                                    elif custom_value_stripped.lower() in (
-                                        "false",
-                                        "0",
-                                        "no",
-                                    ):
-                                        chosen_value = False
-                                    else:
-                                        msg = (
-                                            f"Invalid boolean value for field "
-                                            f"'{field_result.field_name}': "
-                                            f"{custom_value_stripped}"
-                                        )
-                                        raise ValueError(msg)  # noqa: TRY301
-                                else:
-                                    # String or other types - use as-is
-                                    chosen_value = custom_value_stripped
-                            except (ValueError, TypeError) as e:
-                                msg = (
-                                    f"Invalid value type for field "
-                                    f"'{field_result.field_name}': {e}"
-                                )
-                                raise ValueError(msg) from e
-                        else:
-                            # No candidates to infer type from - use as string
-                            chosen_value = custom_value_stripped
-
-                        custom_input = True
-                    elif candidate_value:
-                        # Extract candidate index and find the candidate
-                        selection = _parse_candidate_selection(
-                            candidate_value, field_result.candidates
-                        )
-                        if selection:
-                            chosen_value = selection.value
-                            source_doc_id = selection.source_doc_id
-                            source_location = selection.source_location
-                            field_provenance = selection.provenance
-
-                    if chosen_value is not None:
-                        # Create resolution
-                        resolution = Resolution(
-                            field_name=field_result.field_name,
-                            chosen_value=chosen_value,
-                            source_doc_id=source_doc_id,
-                            source_location=source_location,
-                            custom_input=custom_input,
-                        )
-                        resolutions.append(resolution)
-
-                        # Add to resolved (as array per Extended Schema)
-                        resolved[field_result.field_name] = [chosen_value]
-                        provenance[field_result.field_name] = field_provenance
-
-                # Create PersistedRecord
-                record_id = slugify(
-                    f"record-{extraction_result.run_id}-{datetime.now(UTC).isoformat()}"
-                )
-                record = PersistedRecord(
-                    record_id=record_id,
-                    resolved=resolved,
-                    provenance=provenance,
-                    audit={
-                        "run_id": extraction_result.run_id,
-                        "app_version": "0.0.0",
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "user": None,
-                        "config": {},
-                        "schema_version": extraction_result.schema_version,
-                    },
-                )
+                # Build record using shared helper for consistent ID generation
+                record = _build_resolved_record(extraction_result, *field_values)
 
                 # Save record
                 save_record(record)
@@ -1458,9 +1479,9 @@ def create_review_interface(  # noqa: PLR0915, C901
                 logger.exception("Failed to save record")
                 return f"Error saving record: {e}"
             else:
-                return f"Record saved successfully! Record ID: {record_id}"
+                return f"Record saved successfully! Record ID: {record.record_id}"
 
-        def export_resolved_record_json(  # noqa: PLR0912, PLR0915
+        def export_resolved_record_json(
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> tuple[str, Any]:
@@ -1474,116 +1495,8 @@ def create_review_interface(  # noqa: PLR0915, C901
                 Tuple of (status_message, file_path_or_none)
             """
             try:
-                # Reuse the same logic as save_resolved_record to build the record
-                resolutions: list[Resolution] = []
-                resolved: dict[str, object] = {}
-                provenance: dict[str, list[SourceRef]] = {}
-
-                # Parse field values (same logic as save_resolved_record)
-                field_idx = 0
-                for field_result in extraction_result.results:
-                    candidate_value = (
-                        field_values[field_idx]
-                        if field_idx < len(field_values)
-                        else None
-                    )
-                    custom_value = (
-                        field_values[field_idx + 1]
-                        if field_idx + 1 < len(field_values)
-                        else None
-                    )
-                    field_idx += 2
-
-                    chosen_value: object | None = None
-                    source_doc_id: str | None = None
-                    source_location: str | None = None
-                    custom_input = False
-                    field_provenance: list[SourceRef] = []
-
-                    if custom_value and custom_value.strip():
-                        custom_value_stripped = custom_value.strip()
-                        if field_result.candidates:
-                            candidate_val: Any = field_result.candidates[0].value
-                            try:
-                                if isinstance(candidate_val, int):
-                                    chosen_value = int(custom_value_stripped)
-                                elif isinstance(candidate_val, float):
-                                    chosen_value = float(custom_value_stripped)
-                                elif isinstance(candidate_val, bool):
-                                    if custom_value_stripped.lower() in (
-                                        "true",
-                                        "1",
-                                        "yes",
-                                    ):
-                                        chosen_value = True
-                                    elif custom_value_stripped.lower() in (
-                                        "false",
-                                        "0",
-                                        "no",
-                                    ):
-                                        chosen_value = False
-                                    else:
-                                        msg = (
-                                            f"Invalid boolean value for field "
-                                            f"'{field_result.field_name}': "
-                                            f"{custom_value_stripped}"
-                                        )
-                                        raise ValueError(msg)  # noqa: TRY301
-                                else:
-                                    # String or other types - use as-is
-                                    chosen_value = custom_value_stripped
-                            except (ValueError, TypeError) as e:
-                                msg = (
-                                    f"Invalid value type for field "
-                                    f"'{field_result.field_name}': {e}"
-                                )
-                                raise ValueError(msg) from e
-                        else:
-                            chosen_value = custom_value_stripped
-                        custom_input = True
-                    elif candidate_value:
-                        # Extract candidate index and find the candidate
-                        selection = _parse_candidate_selection(
-                            candidate_value, field_result.candidates
-                        )
-                        if selection:
-                            chosen_value = selection.value
-                            source_doc_id = selection.source_doc_id
-                            source_location = selection.source_location
-                            field_provenance = selection.provenance
-
-                    if chosen_value is not None:
-                        # Add to resolved (as array per Extended Schema)
-                        resolved[field_result.field_name] = [chosen_value]
-                        provenance[field_result.field_name] = field_provenance
-
-                        resolutions.append(
-                            Resolution(
-                                field_name=field_result.field_name,
-                                chosen_value=chosen_value,
-                                source_doc_id=source_doc_id,
-                                source_location=source_location,
-                                custom_input=custom_input,
-                            )
-                        )
-
-                # Create record
-                record_id = slugify(
-                    f"record-{extraction_result.run_id}-{datetime.now(UTC).isoformat()}"
-                )
-                record = PersistedRecord(
-                    record_id=record_id,
-                    resolved=resolved,
-                    provenance=provenance,
-                    audit={
-                        "run_id": extraction_result.run_id,
-                        "app_version": "0.0.0",
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "user": None,
-                        "config": {},
-                        "schema_version": extraction_result.schema_version,
-                    },
-                )
+                # Build record using shared helper for consistent ID generation
+                record = _build_resolved_record(extraction_result, *field_values)
 
                 # Export to JSON file
                 export_data = record.model_dump(mode="json")

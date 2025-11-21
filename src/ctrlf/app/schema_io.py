@@ -26,12 +26,19 @@ from ctrlf.app.errors import SchemaError
 def _is_union_type(origin: Any) -> bool:  # noqa: ANN401
     """Check if origin is a union type (handles both typing.Union and | syntax).
 
+    Handles both:
+    - typing.Union (from Union[str, None] or Optional[str])
+    - types.UnionType (from str | None syntax in Python 3.10+)
+
     Args:
         origin: The origin returned by typing.get_origin()
 
     Returns:
         True if origin represents a union type, False otherwise
     """
+    # Check for both Union and UnionType to handle all Python versions
+    # In Python 3.10+, types.UnionType is an alias for typing.Union,
+    # but we check both for robustness across versions
     return origin is Union or origin is types.UnionType
 
 
