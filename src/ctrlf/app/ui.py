@@ -14,7 +14,6 @@ import shutil
 import tarfile
 import tempfile
 import zipfile
-from datetime import UTC, datetime
 from inspect import cleandoc
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -1435,8 +1434,8 @@ def create_review_interface(  # noqa: PLR0915, C901
                     provenance[field_result.field_name] = field_provenance
 
             # Generate consistent record ID using single format
-            # Use timestamp from extraction_result if available, otherwise current time
-            timestamp = datetime.now(UTC).isoformat()
+            # Use timestamp from extraction_result to ensure save/export use same ID
+            timestamp = extraction_result.created_at
             record_id = slugify(f"record-{extraction_result.run_id}-{timestamp}")
 
             # Create PersistedRecord
