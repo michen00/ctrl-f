@@ -89,6 +89,58 @@ def _safe_snippet(snippet: str) -> str:
     return snippet.replace("```", "``` ")
 
 
+class _CandidateSelection(NamedTuple):
+    """Result of parsing a candidate selection string.
+
+    Attributes:
+        value: The chosen candidate value
+        source_doc_id: Document ID of the first source
+        source_location: Location of the first source
+        provenance: List of source references
+    """
+
+    value: object
+    source_doc_id: str | None
+    source_location: str | None
+    provenance: list[SourceRef]
+
+
+def _parse_candidate_selection(
+    candidate_value: str, candidates: list[Candidate]
+) -> _CandidateSelection | None:
+    """Parse a candidate selection string and extract candidate data.
+
+    The candidate_value format is expected to be "idx:description" where idx is
+    the index into the candidates list.
+
+    Args:
+        candidate_value: Selection string in format "idx:description"
+        candidates: List of available candidates
+
+    Returns:
+        _CandidateSelection with extracted data, or None if parsing fails
+    """
+    try:
+        idx_str = candidate_value.split(":")[0]
+        idx = int(idx_str)
+        if 0 <= idx < len(candidates):
+            candidate = candidates[idx]
+            source_doc_id = None
+            source_location = None
+            if candidate.sources:
+                source_doc_id = candidate.sources[0].doc_id
+                source_location = candidate.sources[0].location
+            return _CandidateSelection(
+                value=candidate.value,
+                source_doc_id=source_doc_id,
+                source_location=source_location,
+                provenance=candidate.sources,
+            )
+    except (ValueError, IndexError):
+        pass
+    return None
+
+
 def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False) -> str:
     """Generate formatted source context display.
 
@@ -1266,7 +1318,7 @@ def create_review_interface(  # noqa: PLR0915, C901
         save_status = gr.Textbox(label="Save Status", interactive=False)
         export_json_output = gr.File(label="Exported JSON", visible=False)
 
-        def save_resolved_record(  # noqa: PLR0912, PLR0915, C901
+        def save_resolved_record(  # noqa: PLR0912, PLR0915
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> str:
@@ -1358,18 +1410,14 @@ def create_review_interface(  # noqa: PLR0915, C901
                         custom_input = True
                     elif candidate_value:
                         # Extract candidate index and find the candidate
-                        try:
-                            idx_str = candidate_value.split(":")[0]
-                            idx = int(idx_str)
-                            if 0 <= idx < len(field_result.candidates):
-                                candidate = field_result.candidates[idx]
-                                chosen_value = candidate.value
-                                field_provenance = candidate.sources
-                                if candidate.sources:
-                                    source_doc_id = candidate.sources[0].doc_id
-                                    source_location = candidate.sources[0].location
-                        except (ValueError, IndexError):
-                            pass
+                        selection = _parse_candidate_selection(
+                            candidate_value, field_result.candidates
+                        )
+                        if selection:
+                            chosen_value = selection.value
+                            source_doc_id = selection.source_doc_id
+                            source_location = selection.source_location
+                            field_provenance = selection.provenance
 
                     if chosen_value is not None:
                         # Create resolution
@@ -1412,7 +1460,7 @@ def create_review_interface(  # noqa: PLR0915, C901
             else:
                 return f"Record saved successfully! Record ID: {record_id}"
 
-        def export_resolved_record_json(  # noqa: PLR0912, PLR0915, C901
+        def export_resolved_record_json(  # noqa: PLR0912, PLR0915
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> tuple[str, Any]:
@@ -1494,18 +1542,15 @@ def create_review_interface(  # noqa: PLR0915, C901
                             chosen_value = custom_value_stripped
                         custom_input = True
                     elif candidate_value:
-                        try:
-                            idx_str = candidate_value.split(":")[0]
-                            idx = int(idx_str)
-                            if 0 <= idx < len(field_result.candidates):
-                                candidate = field_result.candidates[idx]
-                                chosen_value = candidate.value
-                                if candidate.sources:
-                                    source_doc_id = candidate.sources[0].doc_id
-                                    source_location = candidate.sources[0].location
-                                    field_provenance = candidate.sources
-                        except (ValueError, IndexError):
-                            pass
+                        # Extract candidate index and find the candidate
+                        selection = _parse_candidate_selection(
+                            candidate_value, field_result.candidates
+                        )
+                        if selection:
+                            chosen_value = selection.value
+                            source_doc_id = selection.source_doc_id
+                            source_location = selection.source_location
+                            field_provenance = selection.provenance
 
                     if chosen_value is not None:
                         # Add to resolved (as array per Extended Schema)
@@ -1524,7 +1569,7 @@ def create_review_interface(  # noqa: PLR0915, C901
 
                 # Create record
                 record_id = slugify(
-                    f"{extraction_result.run_id}_{datetime.now(UTC).isoformat()}"
+                    f"record-{extraction_result.run_id}-{datetime.now(UTC).isoformat()}"
                 )
                 record = PersistedRecord(
                     record_id=record_id,
