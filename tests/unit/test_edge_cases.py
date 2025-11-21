@@ -354,7 +354,7 @@ class TestSC004ValidationPassRate:
 
         # Create resolutions with valid data (for demonstration)
         # In practice, resolutions would be used to build the resolved dict
-        _resolutions = [
+        assert [
             Resolution(
                 field_name="name",
                 chosen_value="Alice",
