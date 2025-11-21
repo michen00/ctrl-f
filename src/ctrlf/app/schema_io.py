@@ -12,6 +12,7 @@ __all__ = (
 import importlib.util
 import json
 import sys
+import types
 from typing import Any, Union, get_args, get_origin
 
 import jsonschema
@@ -20,6 +21,18 @@ from pydantic import BaseModel, create_model
 from pydantic_core import PydanticUndefined
 
 from ctrlf.app.errors import SchemaError
+
+
+def _is_union_type(origin: Any) -> bool:  # noqa: ANN401
+    """Check if origin is a union type (handles both typing.Union and | syntax).
+
+    Args:
+        origin: The origin returned by typing.get_origin()
+
+    Returns:
+        True if origin represents a union type, False otherwise
+    """
+    return origin is Union or origin is types.UnionType
 
 
 def validate_json_schema(schema_json: str) -> dict[str, Any]:
@@ -175,7 +188,7 @@ def _convert_to_extended_type(
         return original_type
 
     # Handle Optional/Union types
-    if origin is Union or origin is type(None):
+    if _is_union_type(origin):
         args = get_args(original_type)
         # Filter out None
         non_none_args = [arg for arg in args if arg is not type(None)]
