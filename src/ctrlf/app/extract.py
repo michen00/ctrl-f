@@ -262,6 +262,7 @@ Output:
 
     if response_text:
         text_to_parse = response_text.strip()
+        json_parsed_successfully = False
 
         # Try to parse as a single JSON object/array first (handling multi-line JSON)
         try:
@@ -288,6 +289,7 @@ Output:
                     for item in parsed_data
                     if isinstance(item, dict) and "class" in item and "text" in item
                 )
+                json_parsed_successfully = True
             # If it's a dict, flatten it to extractions
             elif isinstance(parsed_data, dict):
                 # For now, we skip complex JSON dict parsing as we enforce flat output
@@ -299,30 +301,32 @@ Output:
             pass
 
         # Fallback to line-delimited processing (robust)
-        for line_raw in response_text.strip().split("\n"):
-            line = line_raw.strip()
-            if not line:
-                continue
-            if line.startswith("```"):
-                continue
-            try:
-                data = json.loads(line)
-                # Only accept if it matches our expected format
-                if isinstance(data, dict) and "class" in data and "text" in data:
-                    extractions.append(
-                        Extraction(
-                            extraction_class=data["class"],
-                            extraction_text=str(data["text"]),
+        # Only run if JSON array parsing didn't succeed to avoid duplicates
+        if not json_parsed_successfully:
+            for line_raw in response_text.strip().split("\n"):
+                line = line_raw.strip()
+                if not line:
+                    continue
+                if line.startswith("```"):
+                    continue
+                try:
+                    data = json.loads(line)
+                    # Only accept if it matches our expected format
+                    if isinstance(data, dict) and "class" in data and "text" in data:
+                        extractions.append(
+                            Extraction(
+                                extraction_class=data["class"],
+                                extraction_text=str(data["text"]),
+                            )
                         )
-                    )
-            except Exception as e:  # noqa: BLE001
-                # Only log if it looks like JSON but failed, or if we are debugging
-                if line.startswith("{"):
-                    logger.warning(
-                        "Failed to parse example extraction line: %s. Error: %s",
-                        line,
-                        e,
-                    )
+                except Exception as e:  # noqa: BLE001
+                    # Only log if it looks like JSON but failed, or if we are debugging
+                    if line.startswith("{"):
+                        logger.warning(
+                            "Failed to parse example extraction line: %s. Error: %s",
+                            line,
+                            e,
+                        )
 
     instrumentation = PrePromptInteraction(
         step_name="generate_example_extractions",
