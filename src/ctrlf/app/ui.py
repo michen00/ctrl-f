@@ -1317,7 +1317,7 @@ def create_review_interface(  # noqa: PLR0915, C901
         save_status = gr.Textbox(label="Save Status", interactive=False)
         export_json_output = gr.File(label="Exported JSON", visible=False)
 
-        def _build_resolved_record(  # noqa: PLR0915
+        def _build_resolved_record(  # noqa: PLR0912, PLR0915
             extraction_result: ExtractionResult,
             *field_values: str,
         ) -> PersistedRecord:
@@ -1338,17 +1338,38 @@ def create_review_interface(  # noqa: PLR0915, C901
             provenance: dict[str, list[SourceRef]] = {}
 
             # Parse field values
+            # Note: Fields with candidates contribute 2 values
+            # (candidate_radio, custom_textbox)
+            # Fields without candidates contribute 1 value (custom_textbox only)
             field_idx = 0
             for field_result in extraction_result.results:
-                candidate_value = (
-                    field_values[field_idx] if field_idx < len(field_values) else None
-                )
-                custom_value = (
-                    field_values[field_idx + 1]
-                    if field_idx + 1 < len(field_values)
-                    else None
-                )
-                field_idx += 2
+                # Check if this field has candidates to determine
+                # how many values it contributes
+                has_candidates = bool(field_result.candidates)
+
+                if has_candidates:
+                    # Field with candidates: read both candidate_radio
+                    # and custom_textbox
+                    candidate_value = (
+                        field_values[field_idx]
+                        if field_idx < len(field_values)
+                        else None
+                    )
+                    custom_value = (
+                        field_values[field_idx + 1]
+                        if field_idx + 1 < len(field_values)
+                        else None
+                    )
+                    field_idx += 2
+                else:
+                    # Field without candidates: only read custom_textbox
+                    candidate_value = None
+                    custom_value = (
+                        field_values[field_idx]
+                        if field_idx < len(field_values)
+                        else None
+                    )
+                    field_idx += 1
 
                 # Determine which value to use
                 chosen_value: object | None = None

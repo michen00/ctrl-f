@@ -81,7 +81,13 @@ def _extract_snippet(
     snippet = markdown[snippet_start:snippet_end]
     # Ensure snippet is at least min_length characters
     if len(snippet) < min_length:
-        snippet = markdown[max(0, start - context) : min(len(markdown), end + context)]
+        # Increase context and re-extract
+        expanded_context = context * 2
+        snippet = markdown[
+            max(0, start - expanded_context) : min(
+                len(markdown), end + expanded_context
+            )
+        ]
         # If still too short, use entire document or pad if necessary
         if len(snippet) < min_length:
             snippet = markdown + " " * (min_length - len(markdown))
