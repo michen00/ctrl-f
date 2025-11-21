@@ -119,25 +119,63 @@ def _parse_candidate_selection(
     Returns:
         _CandidateSelection with extracted data, or None if parsing fails
     """
+    # Handle empty or None input
+    if not candidate_value or not candidate_value.strip():
+        return None
+
+    # Parse index from format "idx:description"
+    parts = candidate_value.split(":", 1)
+    if not parts:
+        logger.debug(
+            "Failed to parse candidate selection: empty string",
+            candidate_value=candidate_value,
+        )
+        return None
+
+    idx_str = parts[0].strip()
+    if not idx_str:
+        logger.debug(
+            "Failed to parse candidate selection: no index found",
+            candidate_value=candidate_value,
+        )
+        return None
+
+    # Convert index to integer
     try:
-        idx_str = candidate_value.split(":")[0]
         idx = int(idx_str)
-        if 0 <= idx < len(candidates):
-            candidate = candidates[idx]
-            source_doc_id = None
-            source_location = None
-            if candidate.sources:
-                source_doc_id = candidate.sources[0].doc_id
-                source_location = candidate.sources[0].location
-            return _CandidateSelection(
-                value=candidate.value,
-                source_doc_id=source_doc_id,
-                source_location=source_location,
-                provenance=candidate.sources,
-            )
-    except (ValueError, IndexError):
-        pass
-    return None
+    except ValueError as e:
+        logger.debug(
+            "Failed to parse candidate selection: invalid index",
+            candidate_value=candidate_value,
+            idx_str=idx_str,
+            error=str(e),
+        )
+        return None
+
+    # Validate index is within bounds
+    if not (0 <= idx < len(candidates)):
+        logger.debug(
+            "Failed to parse candidate selection: index out of range",
+            candidate_value=candidate_value,
+            idx=idx,
+            num_candidates=len(candidates),
+        )
+        return None
+
+    # Extract candidate data
+    candidate = candidates[idx]
+    source_doc_id = None
+    source_location = None
+    if candidate.sources:
+        source_doc_id = candidate.sources[0].doc_id
+        source_location = candidate.sources[0].location
+
+    return _CandidateSelection(
+        value=candidate.value,
+        source_doc_id=source_doc_id,
+        source_location=source_location,
+        provenance=candidate.sources,
+    )
 
 
 def show_source_context(sources: list[SourceRef], *, side_by_side: bool = False) -> str:
