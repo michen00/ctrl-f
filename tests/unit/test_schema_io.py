@@ -304,6 +304,26 @@ class Person(BaseModel):
         instance2 = extended_model(name=["John"], email=["john@example.com"])
         assert instance2.email == ["john@example.com"]  # type: ignore[attr-defined]
 
+    def test_extend_schema_with_pipe_union_syntax(self) -> None:
+        """Test extending schema with Python 3.11+ | None syntax."""
+        code = """
+from pydantic import BaseModel
+
+class Person(BaseModel):
+    name: str
+    email: str | None = None
+"""
+        original_model = import_pydantic_model(code)
+        extended_model = extend_schema(original_model)
+
+        # Optional fields should become Optional[List[type]]
+        instance = extended_model(name=["John"], email=None)
+        assert instance.name == ["John"]  # type: ignore[attr-defined]
+        assert instance.email is None  # type: ignore[attr-defined]
+
+        instance2 = extended_model(name=["John"], email=["john@example.com"])
+        assert instance2.email == ["john@example.com"]  # type: ignore[attr-defined]
+
     def test_extend_schema_with_existing_arrays(self) -> None:
         """Test extending schema where fields are already arrays."""
         code = """
