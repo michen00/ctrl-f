@@ -6,16 +6,12 @@ __all__ = ("MIN_SNIPPET_LENGTH", "run_extraction")
 
 import hashlib
 import json
-import tempfile
-import types
 import uuid
-import webbrowser
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, cast, get_args, get_origin
 
 from google import genai
-from langextract import extract, visualize
-from langextract import io as lx_io
+from langextract import extract
 from langextract.data import AnnotatedDocument, ExampleData, Extraction
 
 from ctrlf.app.logging_conf import get_logger
@@ -27,6 +23,7 @@ from ctrlf.app.models import (
     PrePromptInteraction,
     SourceRef,
 )
+from ctrlf.app.schema_io import _is_union_type
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
@@ -37,18 +34,6 @@ logger = get_logger(__name__)
 
 MIN_SNIPPET_LENGTH = 7
 """Minimum length for extracted snippets (in characters)"""
-
-
-def _is_union_type(origin: Any) -> bool:  # noqa: ANN401
-    """Check if origin is a union type (handles both typing.Union and | syntax).
-
-    Args:
-        origin: The origin returned by typing.get_origin()
-
-    Returns:
-        True if origin represents a union type, False otherwise
-    """
-    return origin is Union or origin is types.UnionType
 
 
 def _create_source_ref(
@@ -512,40 +497,12 @@ def _process_document(
                 )
                 extracted_candidates.append((field_name, candidate))
 
-        # Visualization (Side Effect) - handled separately if needed
-        # if annotated_doc and annotated_doc.extractions:
-        #    _visualize_result(annotated_doc, doc.doc_id)
-
     except Exception as e:  # noqa: BLE001
         logger.warning(
             "Extraction/Visualization failed for document %s: %s", doc.doc_id, e
         )
 
     return extracted_candidates
-
-
-def _visualize_result(annotated_doc: AnnotatedDocument, doc_id: str) -> None:
-    """Visualize extraction result."""
-    try:
-        # Create a temporary file to save the visualization
-        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as tmp:
-            doc_list = [annotated_doc]
-            lx_io.save_annotated_documents(doc_list, tmp.name)  # type: ignore[arg-type]
-            tmp_path = tmp.name
-
-        # Generate visualization HTML
-        html_content = visualize(tmp_path)
-
-        with tempfile.NamedTemporaryFile(
-            suffix=".html", delete=False, mode="w"
-        ) as html_tmp:
-            html_tmp.write(html_content)
-            html_path = html_tmp.name
-
-        logger.info("Opening visualization at %s", html_path)
-        webbrowser.open(f"file://{html_path}")
-    except Exception as e:  # noqa: BLE001
-        logger.warning("Visualization failed for document %s: %s", doc_id, e)
 
 
 def _aggregate_final_results(
