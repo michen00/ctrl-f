@@ -7,6 +7,7 @@ __all__ = ("MIN_SNIPPET_LENGTH", "run_extraction")
 import hashlib
 import json
 import tempfile
+import types
 import uuid
 import webbrowser
 from datetime import UTC, datetime
@@ -36,6 +37,18 @@ logger = get_logger(__name__)
 
 MIN_SNIPPET_LENGTH = 7
 """Minimum length for extracted snippets (in characters)"""
+
+
+def _is_union_type(origin: Any) -> bool:  # noqa: ANN401
+    """Check if origin is a union type (handles both typing.Union and | syntax).
+
+    Args:
+        origin: The origin returned by typing.get_origin()
+
+    Returns:
+        True if origin represents a union type, False otherwise
+    """
+    return origin is Union or origin is types.UnionType
 
 
 def _create_source_ref(
@@ -359,7 +372,7 @@ def _extract_inner_type_from_extended_schema(field_type: object) -> type:
     origin = get_origin(field_type)
 
     # Handle Union types (Optional) - filter out None first
-    if origin is Union or origin is type(None):
+    if _is_union_type(origin):
         args = get_args(field_type)
         # Filter out None type
         non_none_args = [arg for arg in args if arg is not type(None)]
@@ -378,7 +391,7 @@ def _extract_inner_type_from_extended_schema(field_type: object) -> type:
             # If inner type is still a generic (shouldn't happen in Extended Schema)
             # but handle it gracefully
             inner_origin = get_origin(inner_type)
-            if inner_origin is Union or inner_origin is type(None):
+            if _is_union_type(inner_origin):
                 # Handle nested Optional in list (e.g., list[str | None])
                 inner_args = get_args(inner_type)
                 non_none_inner = [arg for arg in inner_args if arg is not type(None)]
