@@ -17,7 +17,6 @@ from ctrlf.app.ingest import CorpusDocument, convert_document_to_markdown
 from ctrlf.app.models import (
     Candidate,
     PersistedRecord,
-    PrePromptInteraction,
     Resolution,
     SourceRef,
 )
@@ -110,8 +109,6 @@ class TestImagesAndTables:
     # These edge cases are now covered by run_extraction tests.
 
 
-@patch("ctrlf.app.extract.generate_synthetic_example")
-@patch("ctrlf.app.extract.generate_example_extractions")
 @patch("ctrlf.app.extract.extract")
 class TestSC003RecallMetrics:
     """Test SC-003: Extraction identifies at least 80% of schema fields in documents."""
@@ -119,28 +116,8 @@ class TestSC003RecallMetrics:
     def test_recall_metric_calculation(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test that recall can be calculated for extraction results."""
-        mock_gen_example.return_value = (
-            "Example",
-            PrePromptInteraction(
-                step_name="generate_synthetic_example",
-                prompt="test prompt",
-                completion="Example",
-                model="gemini-2.5-flash",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="generate_example_extractions",
-                prompt="test prompt",
-                completion="[]",
-                model="gemini-2.5-flash",
-            ),
-        )
 
         # Mock return values with side effect to simulate different docs
         def recall_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
@@ -239,28 +216,8 @@ class TestSC003RecallMetrics:
     def test_recall_with_partial_field_presence(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test recall when fields are partially present across documents."""
-        mock_gen_example.return_value = (
-            "Example",
-            PrePromptInteraction(
-                step_name="generate_synthetic_example",
-                prompt="test prompt",
-                completion="Example",
-                model="gemini-2.5-flash",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="generate_example_extractions",
-                prompt="test prompt",
-                completion="[]",
-                model="gemini-2.5-flash",
-            ),
-        )
 
         def partial_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
             text = kwargs.get("text_or_documents", "")

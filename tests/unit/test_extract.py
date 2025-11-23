@@ -13,14 +13,9 @@ from ctrlf.app.extract import (
     run_extraction,
 )
 from ctrlf.app.ingest import CorpusDocument
-from ctrlf.app.models import (
-    ExtractionResult,
-    PrePromptInteraction,
-)
+from ctrlf.app.models import ExtractionResult
 
 
-@patch("ctrlf.app.extract.generate_synthetic_example")
-@patch("ctrlf.app.extract.generate_example_extractions")
 @patch("ctrlf.app.extract.extract")
 class TestRunExtraction:
     """Test full extraction workflow."""
@@ -28,29 +23,8 @@ class TestRunExtraction:
     def test_run_extraction_creates_field_results(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test that extraction creates FieldResult for each schema field."""
-        mock_gen_example.return_value = (
-            "Example text",
-            PrePromptInteraction(
-                step_name="test",
-                prompt="test",
-                completion="test",
-                model="test",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="test",
-                prompt="test",
-                completion="test",
-                model="test",
-            ),
-        )
-
         # Mock extraction results
         # We need to return a document with extractions for both fields
         e1 = MagicMock(spec=Extraction)
@@ -92,37 +66,19 @@ class TestRunExtraction:
         assert result.created_at
         assert result.schema_version
 
-        # Verify our mocks were called
-        mock_gen_example.assert_called_once()
-        mock_gen_extractions.assert_called_once()
+        # Verify extract was called with Ollama parameters
         mock_extract.assert_called()
+        call_kwargs = mock_extract.call_args.kwargs
+        assert call_kwargs.get("model_id") == "gemma2:2b"
+        assert call_kwargs.get("model_url") == "http://localhost:11434"
+        assert call_kwargs.get("use_schema_constraints") is False
+        assert call_kwargs.get("fence_output") is False
 
     def test_run_extraction_handles_errors_gracefully(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test that extraction continues on individual field/document errors."""
-        mock_gen_example.return_value = (
-            "Example text",
-            PrePromptInteraction(
-                step_name="test",
-                prompt="test",
-                completion="test",
-                model="test",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="test",
-                prompt="test",
-                completion="test",
-                model="test",
-            ),
-        )
-
         # Mock extraction to fail for first doc, succeed for second (empty)
         mock_doc_success = AnnotatedDocument(text="", extractions=[])
 

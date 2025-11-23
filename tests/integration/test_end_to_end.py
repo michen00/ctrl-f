@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from ctrlf.app.extract import run_extraction
 from ctrlf.app.ingest import process_corpus
-from ctrlf.app.models import ExtractionResult, PrePromptInteraction
+from ctrlf.app.models import ExtractionResult
 from ctrlf.app.schema_io import extend_schema, import_pydantic_model
 
 
@@ -47,8 +47,6 @@ def mock_extract_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  
     )
 
 
-@patch("ctrlf.app.extract.generate_synthetic_example")
-@patch("ctrlf.app.extract.generate_example_extractions")
 @patch("ctrlf.app.extract.extract")
 class TestEndToEndWorkflow:
     """Test complete extraction workflow from corpus to results."""
@@ -56,28 +54,8 @@ class TestEndToEndWorkflow:
     def test_full_extraction_workflow(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test complete workflow: ingest -> extract -> aggregate."""
-        mock_gen_example.return_value = (
-            "Example",
-            PrePromptInteraction(
-                step_name="generate_synthetic_example",
-                prompt="test prompt",
-                completion="Example",
-                model="gemini-2.5-flash",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="generate_example_extractions",
-                prompt="test prompt",
-                completion="[]",
-                model="gemini-2.5-flash",
-            ),
-        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Extended Schema model
@@ -116,28 +94,8 @@ class TestEndToEndWorkflow:
     def test_pydantic_model_workflow(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test complete workflow with Pydantic model input (User Story 2)."""
-        mock_gen_example.return_value = (
-            "Example",
-            PrePromptInteraction(
-                step_name="generate_synthetic_example",
-                prompt="test prompt",
-                completion="Example",
-                model="gemini-2.5-flash",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="generate_example_extractions",
-                prompt="test prompt",
-                completion="[]",
-                model="gemini-2.5-flash",
-            ),
-        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Pydantic model code
@@ -194,28 +152,8 @@ class InvoiceModel(BaseModel):
     def test_disagreement_resolution_workflow(
         self,
         mock_extract: MagicMock,
-        mock_gen_extractions: MagicMock,
-        mock_gen_example: MagicMock,
     ) -> None:
         """Test disagreement resolution workflow (User Story 3)."""
-        mock_gen_example.return_value = (
-            "Example",
-            PrePromptInteraction(
-                step_name="generate_synthetic_example",
-                prompt="test prompt",
-                completion="Example",
-                model="gemini-2.5-flash",
-            ),
-        )
-        mock_gen_extractions.return_value = (
-            [],
-            PrePromptInteraction(
-                step_name="generate_example_extractions",
-                prompt="test prompt",
-                completion="[]",
-                model="gemini-2.5-flash",
-            ),
-        )
         mock_extract.side_effect = mock_extract_side_effect
 
         # Create Extended Schema model
