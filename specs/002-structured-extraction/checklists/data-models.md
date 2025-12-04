@@ -139,9 +139,9 @@
 - [x] CHK072 - Are requirements defined for empty extraction text scenario (empty string value, no_match alignment)? [Coverage, Edge Cases, Data Model §ExtractionRecord] ✅ **ADDRESSED** - spec.md edge cases explicitly define empty extraction text scenario
 - [x] CHK073 - Are requirements defined for partial extraction scenario (some fields extracted, others missing)? [Coverage, Edge Cases, Data Model §ExtractionRecord] ✅ **ADDRESSED** - spec.md edge cases explicitly define partial extraction scenario
 - [x] CHK074 - Are requirements defined for Unicode/encoding edge cases (multi-byte characters, emoji, special characters)? [Coverage, Edge Cases, Data Model §Character Interval] ✅ **ADDRESSED** - spec.md edge cases explicitly define Unicode/encoding edge cases
-- [ ] CHK075 - Are requirements defined for very long extraction text scenarios (exceeds document length)? [Coverage, Gap] ⚠️ **GAP** - Not explicitly documented
-- [ ] CHK076 - Are requirements defined for duplicate extraction values scenario (same value extracted multiple times)? [Coverage, Gap] ⚠️ **GAP** - Not explicitly documented (deduplication is per-field, not per-extraction)
-- [ ] CHK077 - Are requirements defined for nested extraction scenarios (extractions within extractions)? [Coverage, Gap] ⚠️ **GAP** - Not explicitly documented
+- [x] CHK075 - Are requirements defined for very long extraction text scenarios (exceeds document length)? [Coverage, Edge Cases, Data Model §ExtractionRecord] ✅ **ADDRESSED** - spec.md edge cases explicitly define very long extraction text scenario (alignment_status "no_match", char_interval {0, 0}, extraction still included)
+- [x] CHK076 - Are requirements defined for duplicate extraction values scenario (same value extracted multiple times)? [Coverage, Edge Cases, Data Model §ExtractionRecord] ✅ **ADDRESSED** - spec.md edge cases explicitly define duplicate extraction values scenario (separate ExtractionRecord objects with unique extraction_index, deduplication is per-field across documents)
+- [x] CHK077 - Are requirements defined for nested extraction scenarios (extractions within extractions)? [Coverage, Edge Cases, Data Model §ExtractionRecord] ✅ **ADDRESSED** - spec.md edge cases explicitly define nested extraction scenarios (schema flattening converts nested structures to flat field names, separate ExtractionRecord objects created)
 - [x] CHK078 - Are requirements defined for malformed document text scenario (invalid markdown, encoding issues)? [Coverage, Edge Cases, Data Model §JSONLLine] ✅ **ADDRESSED** - spec.md edge cases define malformed document handling
 - [x] CHK079 - Are requirements defined for missing document_id scenario (duplicate IDs, invalid IDs)? [Coverage, Edge Cases, Data Model §JSONLLine] ✅ **ADDRESSED** - spec.md edge cases define duplicate document IDs scenario
 
@@ -191,8 +191,8 @@
 ## Summary
 
 **Total Items**: 100
-**Completed**: 98 ✅
-**Partial/Gaps**: 2 ⚠️
+**Completed**: 100 ✅
+**Partial/Gaps**: 0 ⚠️
 **Focus Areas**: Data Models (ExtractionRecord, JSONLLine), Format Requirements (JSONL), Character Intervals, Alignment Status, Data Flow
 **Depth Level**: Formal Release Gate (Comprehensive)
 **Integration Points**: API Response, Schema Flattening, Visualization, Error Handling, Backward Compatibility
@@ -207,11 +207,9 @@
 
 **Items Requiring Attention**:
 
-1. **CHK075** (Gap) - Very long extraction text scenarios not documented
-2. **CHK076** (Gap) - Duplicate extraction values scenario not explicitly documented
-3. **CHK077** (Gap) - Nested extraction scenarios not explicitly documented
+None - All items have been addressed.
 
 **Next Steps**:
 
-1. Consider documenting edge cases for very long extraction text, duplicate values, and nested extractions (or explicitly mark as out of scope)
+1. ✅ All edge cases (CHK075, CHK076, CHK077) have been documented in spec.md
 2. ✅ All previously identified partial items (CHK016, CHK020, CHK063) have been addressed in data-model.md
