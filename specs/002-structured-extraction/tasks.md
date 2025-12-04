@@ -129,9 +129,9 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T042 [P] [US3] Unit test for visualize_extractions function in tests/unit/test_structured_extract.py
-- [ ] T043 [P] [US3] Unit test for JSONL format validation in tests/unit/test_structured_extract.py
-- [ ] T044 [US3] Integration test for visualization workflow in tests/integration/test_structured_extraction_e2e.py
+- [x] T042 [P] [US3] Unit test for visualize_extractions function in tests/unit/test_structured_extract.py ✅ **COMPLETE** - Comprehensive tests for visualize_extractions with various return types and error handling
+- [x] T043 [P] [US3] Unit test for JSONL format validation in tests/unit/test_structured_extract.py ✅ **COMPLETE** - Tests for \_validate_jsonl_format covering valid files, missing fields, wrong types, and edge cases
+- [x] T044 [US3] Integration test for visualization workflow in tests/integration/test_structured_extraction_e2e.py ✅ **COMPLETE** - test_visualization_workflow exists and tests end-to-end visualization
 
 ### Implementation for User Story 3
 
@@ -148,10 +148,10 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 **Purpose**: Integration with existing Gradio UI and ensuring backward compatibility
 
-- [ ] T058 [P] Integrate structured extraction into existing Gradio UI as primary extraction option in src/ctrlf/app/ui.py (FR-014)
-- [ ] T059 [P] Ensure backward compatibility with existing extract.py logic (can coexist, new pipeline is primary) (FR-015)
-- [ ] T060 [P] Verify deduplication logic works with structured extraction results (uses existing aggregate.py) (FR-016)
-- [ ] T061 [P] Verify plurality vote suggestion mechanism works with structured extraction results (uses existing aggregate.py) (FR-017)
+- [x] T058 [P] Integrate structured extraction into existing Gradio UI as primary extraction option in src/ctrlf/app/ui.py (FR-014) ✅ **COMPLETE** - Added provider, model, and fuzzy_threshold UI controls; structured extraction is primary via run_extraction
+- [x] T059 [P] Ensure backward compatibility with existing extract.py logic (can coexist, new pipeline is primary) (FR-015) ✅ **COMPLETE** - run_extraction already uses structured extraction internally, maintains backward compatibility
+- [x] T060 [P] Verify deduplication logic works with structured extraction results (uses existing aggregate.py) (FR-016) ✅ **COMPLETE** - run_extraction converts structured extraction to Candidate objects, uses aggregate_field_results for deduplication
+- [x] T061 [P] Verify plurality vote suggestion mechanism works with structured extraction results (uses existing aggregate.py) (FR-017) ✅ **COMPLETE** - detect_consensus in aggregate.py implements plurality vote and works with structured extraction results
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
@@ -165,7 +165,7 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 - [x] T054 [P] Add type hints to all functions in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T055 [P] Run make check to ensure all linting and type checking passes ✅ **COMPLETE**
 - [x] T056 [P] Update README.md with structured extraction usage examples ✅ **COMPLETE**
-- [ ] T057 [P] Run quickstart.md validation to ensure examples work
+- [x] T057 [P] Run quickstart.md validation to ensure examples work ✅ **COMPLETE** - Validated quickstart examples match implementation; corrected default provider documentation (Ollama is default, not OpenAI)
 
 ---
 
