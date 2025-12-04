@@ -121,6 +121,7 @@ repos:
           - pydantic[mypy]
           - pytest
           - python-slugify
+          - structlog
           - thefuzz
           - typer
           - types-pyyaml

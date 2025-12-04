@@ -6,8 +6,9 @@ __all__ = "configure_logging", "get_logger"
 
 import logging
 import sys
+from typing import cast
 
-import structlog  # type: ignore[import-not-found]
+import structlog
 
 
 def configure_logging(level: str = "INFO") -> None:
@@ -52,4 +53,4 @@ def get_logger(*args: object, **initial_values: object) -> structlog.BoundLogger
     Returns:
         Configured structlog logger
     """
-    return structlog.get_logger(*args, **initial_values)
+    return cast("structlog.BoundLogger", structlog.get_logger(*args, **initial_values))

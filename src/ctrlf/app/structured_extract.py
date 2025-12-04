@@ -303,9 +303,7 @@ def _call_structured_extraction_api(
             len(extracted_data),
         )
     except Exception as e:
-        logger.exception(
-            "Structured extraction failed with %s: %s", model_str, exc_info=e
-        )
+        logger.exception("Structured extraction failed with %s", model_str, exc_info=e)
         msg = f"Extraction failed: {e}"
         raise RuntimeError(msg) from e
     else:
