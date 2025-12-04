@@ -25,45 +25,52 @@ Note: langextract is now only used for visualization (`langextract.visualize()`)
 
 ## Context
 
-A draft implementation already exists in `src/ctrlf/app/structured_extract.py` that provides:
+The implementation in `src/ctrlf/app/structured_extract.py` is complete and provides:
 
 - Data models (`ExtractionRecord`, `JSONLLine`) matching the JSONL format required by `langextract.visualize()`
 - Fuzzy character interval finding using `thefuzz` to locate extracted text in documents
 - JSONL file writing and visualization wrapper
 - Schema flattening for nested structures
+- **PydanticAI integration**: `_call_structured_extraction_api()` uses PydanticAI Agent to support Ollama (default), OpenAI, and Gemini providers with unified schema handling
 
-However, the API integration is currently a placeholder (`_call_structured_extraction_api()`) and needs to be fully implemented.
+**Implementation Status**: ✅ Complete - The PydanticAI integration is fully implemented and supports all three providers (Ollama, OpenAI, Gemini) through a unified interface.
 
 ## User Scenarios & Testing _(mandatory)_
 
-### User Story 1 - Extract Using OpenAI Structured Outputs (Priority: P1)
+### User Story 1 - Extract Using Structured Outputs (Priority: P1)
 
-A user wants to extract structured data from documents using OpenAI's structured output capabilities for better accuracy and schema adherence. They provide a schema and corpus, and the system processes each document individually using OpenAI's API with JSON Schema constraints, then generates a JSONL file for visualization.
+A user wants to extract structured data from documents using PydanticAI with Ollama (default), OpenAI, or Gemini. They provide a schema and corpus, and the system processes each document individually using PydanticAI Agent with Pydantic model constraints, then generates a JSONL file for visualization.
 
-**Why this priority**: This is the core value proposition - leveraging cloud APIs for potentially higher-quality extraction with native structured output support.
+**Why this priority**: This is the core value proposition - leveraging PydanticAI for unified schema-based extraction with support for local (Ollama) and cloud (OpenAI/Gemini) providers.
 
-**Independent Test**: Can be tested by providing a simple schema and a small corpus (2-3 documents), calling OpenAI API with structured outputs, and verifying the JSONL output format matches expectations.
+**Provider Details**:
+
+- **Ollama** (default): Local development provider, no API keys required, runs models locally
+- **OpenAI**: Cloud provider, requires OPENAI_API_KEY, uses structured outputs via PydanticAI
+- **Gemini**: Cloud provider, requires GOOGLE_API_KEY, uses structured outputs via PydanticAI
+
+**Independent Test**: Can be tested by providing a simple schema and a small corpus (2-3 documents), calling PydanticAI Agent with provider="ollama" (or "openai"/"gemini"), and verifying the JSONL output format matches expectations.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user has a JSON Schema and corpus documents, **When** they run structured extraction with OpenAI provider, **Then** the system calls OpenAI API with `response_format` containing the schema and returns structured JSON
-2. **Given** OpenAI API returns structured data, **When** the system processes the response, **Then** it generates valid JSONL lines with character intervals and alignment status
+1. **Given** a user has a Pydantic model schema and corpus documents, **When** they run structured extraction with any provider (Ollama/OpenAI/Gemini), **Then** the system calls PydanticAI Agent with the schema model and returns structured data
+2. **Given** PydanticAI Agent returns structured data, **When** the system processes the response, **Then** it generates valid JSONL lines with character intervals and alignment status
 3. **Given** extraction completes successfully, **When** the user requests visualization, **Then** the system generates HTML visualization using `langextract.visualize()`
 
 ---
 
-### User Story 2 - Extract Using Gemini Structured Outputs (Priority: P1)
+### User Story 2 - Provider Selection and Configuration (Priority: P1)
 
-A user wants to use Gemini API as an alternative to OpenAI for structured extraction. The system should support both providers with similar functionality.
+A user wants to select between Ollama (local), OpenAI, or Gemini providers for structured extraction. The system should support all three providers with unified functionality through PydanticAI.
 
-**Why this priority**: Provider flexibility is important for users who prefer different APIs or have different cost/performance requirements.
+**Why this priority**: Provider flexibility is important for users who prefer local development (Ollama), different cloud APIs (OpenAI/Gemini), or have different cost/performance requirements.
 
-**Independent Test**: Can be tested by switching provider to "gemini" and verifying API calls use Gemini's `response_schema` format correctly.
+**Independent Test**: Can be tested by switching provider to "ollama", "openai", or "gemini" and verifying PydanticAI Agent calls use the correct provider configuration.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user selects Gemini as the provider, **When** they run structured extraction, **Then** the system calls Gemini API with `response_schema` in generation config
-2. **Given** Gemini API returns structured data, **When** the system processes the response, **Then** it generates the same JSONL format as OpenAI extractions
+1. **Given** a user selects a provider (Ollama/OpenAI/Gemini), **When** they run structured extraction, **Then** the system calls PydanticAI Agent with the correct provider model string (e.g., "ollama:llama3", "openai:gpt-4o", "google-gla:gemini-2.5-flash")
+2. **Given** PydanticAI Agent returns structured data from any provider, **When** the system processes the response, **Then** it generates the same JSONL format regardless of provider
 3. **Given** API errors occur (rate limits, timeouts), **When** processing documents, **Then** the system continues with other documents and logs clear error messages
 
 ---
@@ -97,8 +104,8 @@ A user wants to visualize extractions in HTML format and export results as JSONL
 
 ### Functional Requirements
 
-- **FR-001**: System MUST support OpenAI API with structured outputs using `response_format={"type": "json_schema", "json_schema": {...}}`
-- **FR-002**: System MUST support Gemini API with structured outputs using `response_schema` in generation config
+- **FR-001**: System MUST support PydanticAI Agent for structured extraction with Ollama (default), OpenAI, and Gemini providers. PydanticAI unifies schema handling by accepting Pydantic models as `output_type`, eliminating the need for separate API client implementations.
+- **FR-002**: System MUST use Ollama as the default provider for local development. Ollama requires no API keys and runs models locally, making it ideal for development and testing.
 - **FR-003**: System MUST process each document in the corpus individually, making one API call per document (no batching multiple documents into single API requests)
 - **FR-004**: System MUST use fuzzy regex matching to locate extracted text in source documents and calculate character intervals
 - **FR-005**: System MUST generate JSONL files compatible with `langextract.visualize()` format
@@ -106,8 +113,8 @@ A user wants to visualize extractions in HTML format and export results as JSONL
 - **FR-016**: System MUST deduplicate extractions to show all unique values for user review
 - **FR-017**: System MUST provide a suggested value based on plurality vote (most common extraction value) but MUST NOT auto-select it
 - **FR-007**: System MUST handle API errors gracefully (rate limits, timeouts, invalid responses) and continue processing other documents
-- **FR-008**: System MUST support API key configuration with precedence order: UI input (highest priority) → environment variables (OPENAI_API_KEY, GOOGLE_API_KEY) → config file (~/.ctrlf/config.toml) (lowest priority)
-- **FR-009**: System MUST allow selection of provider (OpenAI vs Gemini) and model
+- **FR-008**: System MUST support API key configuration with precedence order: UI input (highest priority) → environment variables (OPENAI_API_KEY, GOOGLE_API_KEY) → config file (~/.ctrlf/config.toml) (lowest priority). Note: Ollama provider does not require API keys. Config file format: TOML with `[api_keys]` section containing `openai_api_key` and `google_api_key` fields.
+- **FR-009**: System MUST allow selection of provider (Ollama, OpenAI, or Gemini) and model. Default provider is "ollama" with default model "llama3". For OpenAI, default model is "gpt-4o". For Gemini, default model is "gemini-2.5-flash".
 - **FR-010**: System MUST support configurable fuzzy matching threshold
 - **FR-011**: System MUST integrate with `langextract.visualize()` to generate HTML visualizations
 - **FR-012**: System MUST support saving visualizations to file or returning as string
@@ -146,10 +153,10 @@ A user wants to visualize extractions in HTML format and export results as JSONL
 
 ## Success Criteria
 
-- Successfully call OpenAI API with structured outputs and parse results
-- Successfully call Gemini API with structured outputs and parse results
+- Successfully call PydanticAI Agent with Ollama, OpenAI, or Gemini providers and parse structured results
 - Generate valid JSONL files that can be visualized with `langextract.visualize()`
 - Accurately locate extractions in source documents using fuzzy matching
 - Handle errors gracefully and provide useful feedback
 - Integrate into existing Gradio UI as the primary extraction option
 - Maintain backward compatibility with existing extraction pipeline
+- Support local development with Ollama (no API keys required)
