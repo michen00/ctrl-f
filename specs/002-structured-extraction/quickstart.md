@@ -102,12 +102,12 @@ schema = convert_json_schema_to_pydantic(schema_dict)
 # Process corpus
 corpus_docs = process_corpus("path/to/corpus")
 
-# Run structured extraction with OpenAI
+# Run structured extraction with Ollama (default, no API key needed)
 jsonl_lines = run_structured_extraction(
     schema=schema,
     corpus_docs=corpus_docs,
-    provider="openai",
-    model="gpt-4o",
+    provider="ollama",  # Can omit this parameter to use default
+    model="llama3",  # Optional, uses default if omitted
     fuzzy_threshold=80,
 )
 
@@ -121,6 +121,18 @@ html_content = visualize_extractions(
 )
 ```
 
+**Using OpenAI instead**:
+
+```python
+jsonl_lines = run_structured_extraction(
+    schema=schema,
+    corpus_docs=corpus_docs,
+    provider="openai",
+    model="gpt-4o",  # Optional, uses default if omitted
+    fuzzy_threshold=80,
+)
+```
+
 **Using Gemini instead**:
 
 ```python
@@ -128,7 +140,7 @@ jsonl_lines = run_structured_extraction(
     schema=schema,
     corpus_docs=corpus_docs,
     provider="gemini",
-    model="gemini-2.0-flash-exp",
+    model="gemini-2.5-flash",  # Optional, uses default if omitted
     fuzzy_threshold=80,
 )
 ```
@@ -137,13 +149,17 @@ jsonl_lines = run_structured_extraction(
 
 ### Provider Selection
 
-- **OpenAI**: Use `provider="openai"` (default)
+- **Ollama** (default): Use `provider="ollama"` or omit provider parameter
+  - Models: `"llama3"` (default), `"llama3.2"`, `"mistral"`, etc.
+  - No API key required (local only)
+  - Best for local development and testing
 
-  - Models: `"gpt-4o"`, `"gpt-4-turbo"`, `"gpt-3.5-turbo"`
+- **OpenAI**: Use `provider="openai"`
+  - Models: `"gpt-4o"` (default), `"gpt-4-turbo"`, `"gpt-3.5-turbo"`
   - Requires `OPENAI_API_KEY` environment variable
 
 - **Gemini**: Use `provider="gemini"`
-  - Models: `"gemini-2.0-flash-exp"`, `"gemini-1.5-pro"`, `"gemini-1.5-flash"`
+  - Models: `"gemini-2.5-flash"` (default), `"gemini-2.0-flash-exp"`, `"gemini-1.5-pro"`, `"gemini-1.5-flash"`
   - Requires `GOOGLE_API_KEY` environment variable
 
 ### Fuzzy Matching Threshold
