@@ -7,7 +7,9 @@
 
 ## Summary
 
-Build a schema-driven document extraction application that accepts JSON Schema or Pydantic models and a corpus of documents, extracts candidate values for each schema field using langextract with full provenance tracking, presents candidates for user review and resolution via Gradio UI, and persists validated records to TinyDB with audit trails. The system enforces zero fabrication (all candidates must be grounded in source documents) and provides comprehensive source location tracking.
+Build a schema-driven document extraction application that accepts JSON Schema or Pydantic models and a corpus of documents, extracts candidate values for each schema field using PydanticAI (with Ollama/OpenAI/Gemini) with full provenance tracking, presents candidates for user review and resolution via Gradio UI, and persists validated records to TinyDB with audit trails. The system enforces zero fabrication (all candidates must be grounded in source documents) and provides comprehensive source location tracking.
+
+**Note**: Previously used langextract for extraction, but this has been replaced with PydanticAI. langextract is now only used for visualization.
 
 ## Technical Context
 
@@ -18,7 +20,8 @@ Build a schema-driven document extraction application that accepts JSON Schema o
 - gradio (web UI framework)
 - tinydb (local JSON-based database)
 - markitdown (document to Markdown conversion)
-- langextract (field extraction from documents)
+- pydantic-ai (unified schema-based extraction with Ollama/OpenAI/Gemini)
+- langextract (visualization only, not used for extraction)
 - thefuzz (fuzzy string matching for deduplication, uses rapidfuzz under the hood)
 - python-slugify (ID generation)
 - structlog (structured logging)
@@ -49,7 +52,7 @@ Build a schema-driven document extraction application that accepts JSON Schema o
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Test-First Development (NON-NEGOTIABLE)
 
@@ -123,7 +126,7 @@ src/
 │       ├── models.py          # Pydantic data models
 │       ├── schema_io.py       # Schema validation and conversion
 │       ├── ingest.py          # markitdown wrapper and source mapping
-│       ├── extract.py         # langextract adapters
+│       ├── extract.py         # PydanticAI-based extraction (replaced langextract)
 │       ├── aggregate.py       # Candidate clustering, normalization, consensus
 │       ├── storage.py         # TinyDB adapter
 │       └── logging_conf.py    # structlog configuration
@@ -147,8 +150,8 @@ tests/
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
+| Violation                                    | Why Needed                                                                                                                                                                                  | Simpler Alternative Rejected Because                                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Gradio web UI instead of CLI (Principle III) | Interactive review interface essential for candidate selection, source viewing, and conflict resolution. Users need to see source context, compare candidates, and make informed decisions. | Pure CLI with JSON I/O rejected because review/resolution workflow requires visual comparison of candidates and source snippets. Batch mode without review would reduce accuracy and user trust. |
 
 ## Phase 0: Research Complete
@@ -156,7 +159,7 @@ tests/
 All technology decisions documented in `research.md`. Key decisions:
 
 - markitdown for document conversion
-- langextract for field extraction
+- PydanticAI for field extraction (replaced langextract)
 - thefuzz for deduplication (clean API wrapper around rapidfuzz)
 - TinyDB for persistence
 - Gradio for UI

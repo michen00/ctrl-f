@@ -29,7 +29,7 @@ description: "Task list template for feature implementation"
 **Purpose**: Project initialization and basic structure
 
 - [x] T001 Create project structure per implementation plan (src/ctrlf/app/, tests/unit/, tests/integration/, tests/contract/)
-- [x] T002 Update pyproject.toml with dependencies: pydantic>=2, gradio, tinydb, markitdown, langextract, thefuzz, python-slugify, structlog, jsonschema
+- [x] T002 Update pyproject.toml with dependencies: pydantic>=2, gradio, tinydb, markitdown, pydantic-ai, langextract (visualization only), thefuzz, python-slugify, structlog, jsonschema
 - [x] T003 [P] Configure linting and formatting tools (ruff, pylint, mypy) in pyproject.toml
 - [x] T004 [P] Setup pytest configuration in pyproject.toml with coverage settings
 

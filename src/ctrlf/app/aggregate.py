@@ -10,7 +10,7 @@ __all__ = (
     "normalize_value",
 )
 
-from thefuzz import fuzz  # type: ignore[import-not-found]
+from thefuzz import fuzz
 
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import Candidate, FieldResult

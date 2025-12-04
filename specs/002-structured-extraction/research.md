@@ -5,22 +5,46 @@
 
 ## Technology Stack Decisions
 
-### OpenAI API Client
+### PydanticAI for Unified Schema Handling
 
-**Decision**: Use `openai` Python package (official OpenAI SDK) for structured outputs.
+**Decision**: Use PydanticAI to unify schema handling across all LLM providers (Ollama, OpenAI, Gemini).
 
 **Rationale**:
 
-- Official SDK maintained by OpenAI with best support for latest features
-- Native support for structured outputs via `response_format` parameter
-- Handles authentication, retries, and error handling
+- Provides unified interface for structured outputs across providers
+- Accepts Pydantic models directly as `output_type`, eliminating need for JSON Schema conversion
+- Supports Ollama (local development), OpenAI, and Gemini providers
+- Handles schema validation automatically
+- Simplifies codebase by removing provider-specific API calls
+
+**Why not langextract**:
+
+- **Requires in-context examples**: langextract requires few-shot examples in the prompt, which adds complexity and token overhead
+- **Cannot condition on schema**: Unlike modern APIs, langextract cannot directly use JSON Schema to constrain outputs - it relies on prompt engineering with examples
+- **Less flexible**: The need for examples makes it harder to adapt to different schemas dynamically
+
+**Alternatives considered**:
+
+- Direct API calls (OpenAI, Gemini) - more complex, requires provider-specific code
+- langextract - requires in-context examples, cannot condition on schema
+- Custom extraction pipeline - too complex for v0
+
+### OpenAI API Client (via PydanticAI)
+
+**Decision**: Use PydanticAI which wraps `openai` Python package for OpenAI provider.
+
+**Rationale**:
+
+- PydanticAI provides unified interface, uses official OpenAI SDK internally
+- Native support for structured outputs via Pydantic models
+- Handles authentication, retries, and error handling automatically
 - Version 1.0+ supports structured outputs with JSON Schema
 
 **Alternatives considered**:
 
+- Direct `openai` package usage - more complex, requires manual handling
 - `openai-python` (older package name) - deprecated in favor of `openai`
 - Direct HTTP requests - more complex, requires manual handling of auth, retries, rate limits
-- Third-party wrappers - unnecessary abstraction layer
 
 **Implementation Details**:
 

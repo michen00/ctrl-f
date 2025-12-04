@@ -149,7 +149,9 @@ Final saved record after user completes review and resolution.
 
 ### PrePromptInteraction
 
-Represents a single pre-prompt interaction before langextract.extract is called.
+Represents a single pre-prompt interaction (deprecated - kept for compatibility).
+
+**Note**: Previously used with langextract, but extraction now uses PydanticAI which doesn't require pre-prompts.
 
 **Fields**:
 
@@ -170,7 +172,9 @@ Represents a single pre-prompt interaction before langextract.extract is called.
 
 ### PrePromptInstrumentation
 
-Instrumentation data for pre-prompts before langextract.extract is called.
+Instrumentation data for pre-prompts (deprecated - kept for compatibility).
+
+**Note**: Previously used with langextract, but extraction now uses PydanticAI which doesn't require pre-prompts.
 
 **Fields**:
 

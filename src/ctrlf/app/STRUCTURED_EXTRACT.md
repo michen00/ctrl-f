@@ -1,16 +1,17 @@
-# Structured Extraction Draft Implementation
+# Structured Extraction Implementation
 
-This is a draft implementation of a new extraction approach using structured outputs from OpenAI/Gemini.
+This module provides the primary extraction approach using PydanticAI with Ollama/OpenAI/Gemini.
 
 ## Overview
 
-The `structured_extract.py` module provides an alternative extraction pipeline that:
+The `structured_extract.py` module provides the primary extraction pipeline that:
 
-1. **Uses Structured Outputs**: Leverages OpenAI and Gemini's native structured output capabilities with JSON Schema
-2. **Per-Document Processing**: Processes each document individually with the schema passed to the API
-3. **Fuzzy Character Alignment**: Uses fuzzy regex matching to find where each extraction appears in the document
-4. **JSONL Output**: Creates a JSONL file with a format compatible with `langextract.visualize()`
-5. **Visualization**: Can generate HTML visualizations of the extractions
+1. **Uses PydanticAI**: Leverages PydanticAI Agent with Pydantic models for unified schema handling
+2. **Supports Multiple Providers**: Ollama (default for local development), OpenAI, and Gemini
+3. **Per-Document Processing**: Processes each document individually with the Extended Schema model
+4. **Fuzzy Character Alignment**: Uses fuzzy regex matching to find where each extraction appears in the document
+5. **JSONL Output**: Creates a JSONL file with a format compatible with `langextract.visualize()`
+6. **Visualization**: Can generate HTML visualizations of the extractions
 
 ## Key Components
 
@@ -53,7 +54,7 @@ Represents one line in the JSONL output:
 
 ### ⚠️ TODO (Placeholder)
 
-- **API Integration**: `_call_structured_extraction_api()` is a placeholder
+- **API Integration**: `_call_structured_extraction_api()` uses PydanticAI Agent (supports Ollama, OpenAI, Gemini)
   - Needs OpenAI client integration with `response_format={"type": "json_schema"}`
   - Needs Gemini client integration with `response_schema`
   - Requires API keys and proper error handling
@@ -84,12 +85,12 @@ schema_json = '''
 schema = convert_json_schema_to_pydantic(json.loads(schema_json))
 corpus_docs = process_corpus("path/to/corpus")
 
-# Run structured extraction
+# Run structured extraction (Ollama is default)
 jsonl_lines = run_structured_extraction(
     schema=schema,
     corpus_docs=corpus_docs,
-    provider="openai",  # or "gemini"
-    model="gpt-4o",     # or "gemini-2.0-flash-exp"
+    provider="ollama",  # or "openai", "gemini"
+    model="llama3",     # or "gpt-4o", "gemini-2.0-flash-exp"
     fuzzy_threshold=80,
 )
 
@@ -113,12 +114,12 @@ Each line follows this structure:
     {
       "extraction_class": "character",
       "extraction_text": "Lady Juliet",
-      "char_interval": {"start_pos": 0, "end_pos": 11},
+      "char_interval": { "start_pos": 0, "end_pos": 11 },
       "alignment_status": "match_exact",
       "extraction_index": 1,
       "group_index": 0,
       "description": null,
-      "attributes": {"emotional_state": "longing"}
+      "attributes": { "emotional_state": "longing" }
     }
   ],
   "text": "Lady Juliet gazed longingly at the stars...",
@@ -137,7 +138,7 @@ This module is designed to be **non-interfering** with existing extraction logic
 
 ## Next Steps
 
-1. Implement actual API calls in `_call_structured_extraction_api()`
+1. ✅ Implemented PydanticAI integration in `_call_structured_extraction_api()` (supports Ollama, OpenAI, Gemini)
 2. Add proper error handling and retry logic
 3. Add configuration for API keys and model selection
 4. Consider adding disambiguation/consensus logic similar to existing pipeline

@@ -1,4 +1,4 @@
-"""Field extraction module using langextract."""
+"""Field extraction module using PydanticAI with Ollama/OpenAI/Gemini."""
 
 from __future__ import annotations
 
@@ -8,9 +8,7 @@ import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast, get_args, get_origin
-
-from langextract import extract
+from typing import TYPE_CHECKING, Any, NamedTuple, cast, get_args, get_origin
 
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import (
@@ -23,12 +21,26 @@ from ctrlf.app.models import (
 from ctrlf.app.schema_io import _is_union_type
 
 if TYPE_CHECKING:
-    from langextract.data import AnnotatedDocument
     from pydantic import BaseModel
 
     from ctrlf.app.ingest import CorpusDocument
 
 logger = get_logger(__name__)
+
+
+class SetupExtractionResult(NamedTuple):
+    """Result of extraction setup phase.
+
+    Attributes:
+        schema_str: JSON Schema as formatted string
+        schema_dict: JSON Schema as dictionary
+        instrumentation: Pre-prompt instrumentation data
+    """
+
+    schema_str: str
+    schema_dict: dict[str, Any]
+    instrumentation: PrePromptInstrumentation
+
 
 MIN_SNIPPET_LENGTH = 7
 """Minimum length for extracted snippets (in characters)"""
@@ -164,116 +176,98 @@ def _extract_inner_type_from_extended_schema(field_type: object) -> type:
 
 def _setup_extraction(
     model: type[BaseModel],
-) -> tuple[str, str, PrePromptInstrumentation]:
-    """Setup extraction by creating prompt description with embedded schema.
+) -> SetupExtractionResult:
+    """Setup extraction by preparing schema for structured extraction.
 
     Args:
         model: Extended Pydantic model
 
     Returns:
-        Tuple of (schema_str, prompt_description, instrumentation)
+        SetupExtractionResult with schema_str, schema_dict, and instrumentation
     """
     # Use json_schema string as schema representation for stability
-    schema_str = json.dumps(model.model_json_schema(), indent=2)
+    schema_dict = model.model_json_schema()
+    schema_str = json.dumps(schema_dict, indent=2)
 
-    # Embed schema in prompt description
-    prompt_description = (
-        f"Extract structured data based on the following schema:\n\n{schema_str}"
-    )
-
-    # No pre-prompt interactions needed with Ollama
+    # No pre-prompt interactions needed with structured extraction APIs
     instrumentation = PrePromptInstrumentation(interactions=[])
 
-    return schema_str, prompt_description, instrumentation
+    return SetupExtractionResult(schema_str, schema_dict, instrumentation)
 
 
 def _process_document(
     doc: CorpusDocument,
-    prompt_description: str,
+    schema_model: type[BaseModel],
+    provider: str = "ollama",
+    model: str | None = None,
+    fuzzy_threshold: int = 80,
 ) -> list[tuple[str, Candidate]]:
-    """Process a single document and extract candidates.
+    """Process a single document and extract candidates using PydanticAI.
+
+    Uses PydanticAI structured extraction to extract candidates from a document.
+
+    Args:
+        doc: Corpus document to process
+        schema_model: Extended Pydantic model class defining the output structure
+        provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
+        model: Model name (optional, uses provider default)
+        fuzzy_threshold: Minimum similarity score for fuzzy matching (0-100)
 
     Returns:
         List of (field_name, Candidate) tuples
     """
+    # Import here to avoid circular dependency
+    from ctrlf.app.structured_extract import (  # noqa: PLC0415
+        _call_structured_extraction_api,
+        _extraction_record_to_candidate,
+        _flatten_extractions,
+        find_char_interval,
+    )
+
     extracted_candidates: list[tuple[str, Candidate]] = []
 
     try:
-        # Extract all fields at once using Ollama
-        # Try omitting examples first, fallback to empty list if needed
-        try:
-            result = extract(
-                text_or_documents=doc.markdown,
-                prompt_description=prompt_description,
-                model_id="gemma2:2b",
-                model_url="http://localhost:11434",
-                fence_output=False,
-                use_schema_constraints=False,
-            )
-        except TypeError:
-            # If examples parameter is required, try with empty list
-            result = extract(
-                text_or_documents=doc.markdown,
-                prompt_description=prompt_description,
-                examples=[],
-                model_id="gemma2:2b",
-                model_url="http://localhost:11434",
-                fence_output=False,
-                use_schema_constraints=False,
+        # Get JSON Schema dict for flattening
+        schema_dict = schema_model.model_json_schema()
+
+        # Call structured extraction API with PydanticAI
+        extracted_data = _call_structured_extraction_api(
+            doc.markdown, schema_model, provider=provider, model=model
+        )
+
+        # Flatten extractions
+        flat_extractions = _flatten_extractions(extracted_data, schema_dict)
+
+        # Convert to Candidates
+        for extraction in flat_extractions:
+            # Find character interval
+            char_interval, alignment_status = find_char_interval(
+                doc.markdown, extraction.value, fuzzy_threshold=fuzzy_threshold
             )
 
-        annotated_doc: AnnotatedDocument | None
-        if isinstance(result, list):
-            annotated_doc = result[0] if result else None
-        else:
-            annotated_doc = result
+            # Create ExtractionRecord-like structure for conversion
+            from ctrlf.app.structured_extract import ExtractionRecord  # noqa: PLC0415
 
-        if annotated_doc and annotated_doc.extractions:
-            for extraction in annotated_doc.extractions:
-                # Map extraction to Candidate
-                field_name = extraction.extraction_class
-                value = extraction.extraction_text
+            extraction_record = ExtractionRecord(
+                extraction_class=extraction.field_name,
+                extraction_text=extraction.value,
+                char_interval=char_interval,
+                alignment_status=alignment_status,
+                extraction_index=0,  # Not needed for Candidate conversion
+                group_index=0,  # Not needed for Candidate conversion
+                description=None,
+                attributes=extraction.attributes,
+            )
 
-                # Handle confidence if available
-                confidence = getattr(extraction, "confidence", 1.0)
-
-                # Grounding
-                span_start = getattr(extraction, "char_start", 0)
-                span_end = getattr(extraction, "char_end", span_start + len(value))
-
-                # Create location descriptor
-                location = _extract_location_from_source_map(
-                    doc.source_map, span_start, span_end
-                )
-
-                # Extract snippet
-                snippet = _extract_snippet(doc.markdown, span_start, span_end)
-
-                source_ref = _create_source_ref(
-                    doc_id=doc.doc_id,
-                    path=doc.source_map.get(
-                        "file_path", doc.source_map.get("file_name", "unknown")
-                    ),
-                    location=location,
-                    snippet=snippet,
-                    metadata={
-                        "span_start": span_start,
-                        "span_end": span_end,
-                        **doc.source_map,
-                    },
-                )
-
-                candidate = Candidate(
-                    value=value,
-                    normalized=None,
-                    confidence=float(confidence),
-                    sources=[source_ref],
-                )
-                extracted_candidates.append((field_name, candidate))
+            # Convert to Candidate
+            candidate = _extraction_record_to_candidate(
+                extraction_record, doc.doc_id, doc.markdown, doc.source_map
+            )
+            extracted_candidates.append((extraction.field_name, candidate))
 
     except Exception as e:  # noqa: BLE001
         logger.warning(
-            "Extraction/Visualization failed for document %s: %s", doc.doc_id, e
+            "Structured extraction failed for document %s: %s", doc.doc_id, e
         )
 
     return extracted_candidates
@@ -319,24 +313,49 @@ def _aggregate_final_results(
 def run_extraction(
     model: type[BaseModel],
     corpus_docs: list[CorpusDocument],
+    provider: str = "ollama",
+    model_name: str | None = None,
+    fuzzy_threshold: int = 80,
 ) -> tuple[ExtractionResult, PrePromptInstrumentation]:
-    """Run extraction for all fields across all documents.
+    """Run extraction for all fields across all documents using PydanticAI.
+
+    Uses PydanticAI structured extraction to extract candidates from all documents.
+
+    Args:
+        model: Extended Pydantic model (all fields are arrays per Extended Schema
+            pattern)
+        corpus_docs: List of corpus documents
+        provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
+        model_name: Model name (optional, uses provider default)
+            For Ollama: defaults to "llama3"
+            For OpenAI: defaults to "gpt-4o"
+            For Gemini: defaults to "gemini-2.5-flash"
+        fuzzy_threshold: Minimum similarity score for fuzzy matching (0-100,
+            default: 80)
 
     Returns:
         Tuple of (complete extraction results, pre-prompt instrumentation)
     """
     run_id = str(uuid.uuid4())
 
-    # 1. Setup Phase: Create prompt with embedded schema
-    schema_str, prompt_description, instrumentation = _setup_extraction(model)
-    schema_version = hashlib.md5(schema_str.encode(), usedforsecurity=False).hexdigest()
+    # 1. Setup Phase: Prepare schema for structured extraction
+    setup_result = _setup_extraction(model)
+    schema_version = hashlib.md5(
+        setup_result.schema_str.encode(), usedforsecurity=False
+    ).hexdigest()
 
     # Collect all candidates per field
     field_candidates: dict[str, list[Candidate]] = {}
 
-    # 2. Extraction Phase: Batch process documents
+    # 2. Extraction Phase: Process documents individually using PydanticAI
     for doc in corpus_docs:
-        candidates = _process_document(doc, prompt_description)
+        candidates = _process_document(
+            doc,
+            model,
+            provider=provider,
+            model=model_name,
+            fuzzy_threshold=fuzzy_threshold,
+        )
         for field_name, candidate in candidates:
             if field_name not in field_candidates:
                 field_candidates[field_name] = []
@@ -346,4 +365,4 @@ def run_extraction(
     extraction_result = _aggregate_final_results(
         model, field_candidates, schema_version, run_id
     )
-    return extraction_result, instrumentation
+    return extraction_result, setup_result.instrumentation

@@ -16,7 +16,7 @@
 
 - **Schema-Driven**: Accepts JSON Schema or Pydantic model definitions
 - **Multi-Format Support**: Processes PDF, DOCX, HTML, TXT from directories or archives (ZIP, TAR, TAR.GZ)
-- **AI-Powered Extraction**: Uses `langextract` with Google GenAI to extract candidate values with confidence scores
+- **AI-Powered Extraction**: Uses PydanticAI with Ollama (default), OpenAI, or Gemini to extract candidate values with confidence scores
 - **Intelligent Deduplication**: Groups near-duplicate candidates using fuzzy string matching (`thefuzz`)
 - **Consensus Detection**: Automatically identifies high-confidence values (confidence ≥0.75, margin ≥0.20)
 - **Full Provenance**: Every value includes source document, location (page/line or char-range), and context snippet
@@ -31,7 +31,7 @@
 - **Gradio** for web UI
 - **TinyDB** for local JSON database storage
 - **markitdown** for document to Markdown conversion
-- **langextract** for field extraction
+- **PydanticAI** for unified schema-based extraction with Ollama (default), OpenAI, or Gemini (langextract is only used for visualization)
 - **thefuzz** for fuzzy string matching
 - **structlog** for structured logging
 - Standard Python tooling (`uv`, `ruff`, `mypy`, `pytest`)
@@ -93,7 +93,7 @@ The `Makefile` is the primary entry point for development tasks.
     - `models.py`: Pydantic data models (SourceRef, Candidate, FieldResult, ExtractionResult, Resolution, PersistedRecord)
     - `schema_io.py`: Schema validation and conversion (JSON Schema ↔ Pydantic)
     - `ingest.py`: Document conversion to Markdown (markitdown wrapper)
-    - `extract.py`: Field extraction using langextract
+    - `extract.py`: Field extraction using PydanticAI with Ollama/OpenAI/Gemini
     - `aggregate.py`: Candidate deduplication, normalization, consensus detection
     - `storage.py`: TinyDB adapter for persistent storage
     - `ui.py`: Gradio interface components

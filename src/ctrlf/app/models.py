@@ -195,7 +195,7 @@ class PersistedRecord(BaseModel):
 
 
 class PrePromptInteraction(BaseModel):
-    """Represents a single pre-prompt interaction before langextract.extract is called.
+    """Represents a single pre-prompt interaction (deprecated - kept for compatibility).
 
     Attributes:
         step_name: Name of the step (e.g., "generate_synthetic_example",
@@ -228,7 +228,7 @@ class PrePromptInteraction(BaseModel):
 
 
 class PrePromptInstrumentation(BaseModel):
-    """Instrumentation data for pre-prompts before langextract.extract is called.
+    """Instrumentation data for pre-prompts (deprecated - kept for compatibility).
 
     Attributes:
         interactions: List of pre-prompt interactions

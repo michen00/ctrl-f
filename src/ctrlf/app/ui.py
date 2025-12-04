@@ -79,6 +79,24 @@ class ExtractionWorkflowResult(NamedTuple):
     error_visibility: Any
 
 
+class UnpackedExtractionResult(NamedTuple):
+    """Unpacked result from extraction workflow for Gradio outputs.
+
+    Attributes:
+        progress_message: Progress status message
+        error_update: Gradio update object for error display
+        extraction_result: Extraction result or None if failed
+        instrumentation_md: Formatted instrumentation markdown
+        instrumentation: Pre-prompt instrumentation data
+    """
+
+    progress_message: str
+    error_update: Any
+    extraction_result: ExtractionResult | None
+    instrumentation_md: str
+    instrumentation: PrePromptInstrumentation
+
+
 def _safe_snippet(snippet: str) -> str:
     """Escape triple backticks in snippet to prevent markdown fence breakage.
 
@@ -996,12 +1014,11 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
         def unpack_result(
             result: ExtractionWorkflowResult,
             instrumentation: PrePromptInstrumentation,
-        ) -> tuple[str, Any, ExtractionResult | None, str, PrePromptInstrumentation]:
+        ) -> UnpackedExtractionResult:
             """Unpack ExtractionWorkflowResult for Gradio outputs.
 
             Returns:
-                Tuple of (progress_message, error_update, extraction_result,
-                formatted instrumentation markdown, instrumentation)
+                UnpackedExtractionResult with all Gradio output values
             """
             # Combine error message and visibility into a single gr.update() object
             # Show error output if there's an error message, hide otherwise
@@ -1010,7 +1027,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 visible=bool(result.error_message),
             )
             instrumentation_md = format_instrumentation(instrumentation)
-            return (
+            return UnpackedExtractionResult(
                 result.progress_message,
                 error_update,
                 result.extraction_result,
@@ -1026,7 +1043,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             _null_policy_str: str,
             _confidence: float,
             progress: gr.Progress | None = None,
-        ) -> tuple[str, Any, ExtractionResult | None, str, PrePromptInstrumentation]:
+        ) -> UnpackedExtractionResult:
             """Wrapper to run extraction workflow and unpack result.
 
             Args:
@@ -1039,8 +1056,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 progress: Gradio progress tracker
 
             Returns:
-                Tuple of (progress_message, error_update, extraction_result,
-                formatted instrumentation markdown, instrumentation)
+                UnpackedExtractionResult with all Gradio output values
             """
             result, instrumentation = run_extraction_workflow(
                 schema_file_path,

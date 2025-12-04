@@ -7,7 +7,7 @@
 
 ## Summary
 
-Add a new extraction pipeline that uses OpenAI and Gemini's native structured output capabilities to extract data from documents. This provides an alternative to the existing langextract-based extraction, leveraging cloud APIs for potentially higher accuracy and better schema adherence. The implementation will integrate OpenAI and Gemini APIs with structured outputs, use fuzzy matching to locate extractions in source documents, generate JSONL files compatible with `langextract.visualize()`, and maintain non-interference with existing extraction logic.
+Replace the existing langextract-based extraction with a new extraction pipeline that uses OpenAI and Gemini's native structured output capabilities. This is now the primary extraction method, replacing langextract for extraction (langextract is only used for visualization). The implementation integrates OpenAI and Gemini APIs with structured outputs, uses fuzzy matching to locate extractions in source documents, generates JSONL files compatible with `langextract.visualize()`, and maintains compatibility with the existing UI and data models.
 
 ## Technical Context
 
@@ -15,9 +15,8 @@ Add a new extraction pipeline that uses OpenAI and Gemini's native structured ou
 **Primary Dependencies**:
 
 - pydantic>=2 (schema validation, data models)
-- openai>=1.0.0 (OpenAI API client with structured outputs support)
-- google-genai>=1.3.0 (already in dependencies, Gemini API client)
-- langextract>=0.1.0 (visualization integration)
+- pydantic-ai>=0.0.14 (unified schema-based extraction with Ollama/OpenAI/Gemini)
+- langextract>=0.1.0 (visualization only, not used for extraction)
 - thefuzz>=0.22.0 (fuzzy string matching for character alignment)
 - structlog>=25.4.0 (structured logging)
 - jsonschema>=4.0.0 (JSON Schema validation)
@@ -49,7 +48,7 @@ Add a new extraction pipeline that uses OpenAI and Gemini's native structured ou
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Test-First Development (NON-NEGOTIABLE)
 
@@ -125,7 +124,7 @@ src/
 │       ├── models.py                # Existing Pydantic models
 │       ├── schema_io.py             # Existing schema validation
 │       ├── ingest.py                # Existing document processing
-│       ├── extract.py               # Existing langextract-based extraction
+│       ├── extract.py               # PydanticAI-based extraction (replaced langextract)
 │       ├── aggregate.py             # Existing candidate aggregation
 │       ├── storage.py               # Existing TinyDB adapter
 │       └── logging_conf.py          # Existing structlog configuration

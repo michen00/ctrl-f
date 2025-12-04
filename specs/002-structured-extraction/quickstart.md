@@ -5,7 +5,9 @@
 
 ## Overview
 
-This feature provides an alternative extraction pipeline that uses OpenAI and Gemini's native structured output capabilities to extract data from documents. It generates JSONL files compatible with `langextract.visualize()` for visualization.
+This feature provides the primary extraction pipeline that uses PydanticAI with Ollama (default), OpenAI, or Gemini to extract data from documents. It generates JSONL files compatible with `langextract.visualize()` for visualization.
+
+**Why not langextract**: langextract requires in-context examples (few-shot learning) and cannot condition extraction directly on the schema like modern APIs. PydanticAI allows us to pass the schema directly as a Pydantic model, eliminating the need for example generation and providing better schema adherence.
 
 ## Prerequisites
 
@@ -53,9 +55,9 @@ Create a JSON Schema file or Pydantic model:
 {
   "type": "object",
   "properties": {
-    "character": {"type": "string"},
-    "emotion": {"type": "string"},
-    "relationship": {"type": "string"}
+    "character": { "type": "string" },
+    "emotion": { "type": "string" },
+    "relationship": { "type": "string" }
   }
 }
 ```
@@ -136,6 +138,7 @@ jsonl_lines = run_structured_extraction(
 ### Provider Selection
 
 - **OpenAI**: Use `provider="openai"` (default)
+
   - Models: `"gpt-4o"`, `"gpt-4-turbo"`, `"gpt-3.5-turbo"`
   - Requires `OPENAI_API_KEY` environment variable
 
@@ -168,7 +171,7 @@ Each line in the JSONL file represents one document:
     {
       "extraction_class": "character",
       "extraction_text": "Lady Juliet",
-      "char_interval": {"start_pos": 0, "end_pos": 11},
+      "char_interval": { "start_pos": 0, "end_pos": 11 },
       "alignment_status": "match_exact",
       "extraction_index": 1,
       "group_index": 0,

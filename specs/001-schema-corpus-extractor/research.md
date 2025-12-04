@@ -22,22 +22,31 @@
 - pandoc: More complex, requires external dependencies, less Python-native
 - Custom parsers: Too much development overhead for v0
 
-### Field Extraction: langextract
+### Field Extraction: Structured Extraction (OpenAI/Gemini)
 
-**Decision**: Use langextract library for extracting candidate values from documents based on schema fields.
+**Decision**: Use OpenAI/Gemini structured outputs for extracting candidate values from documents based on schema fields.
 
 **Rationale**:
 
-- Designed for structured extraction from unstructured text
-- Supports grounding (source span tracking) which is mandatory requirement (FR-004)
-- Can work with field descriptions and type hints to build extraction queries
+- Native structured output support with JSON Schema constraints
+- Can condition extraction directly on schema without requiring in-context examples
+- Supports grounding (source span tracking) via fuzzy matching (mandatory requirement FR-004)
 - Returns confidence scores needed for consensus detection
+- Works with both local models (Ollama) and cloud APIs (OpenAI, Gemini)
+
+**Why not langextract**:
+
+- **Requires in-context examples**: langextract requires few-shot examples in the prompt, which adds complexity and token overhead
+- **Cannot condition on schema**: Unlike modern APIs, langextract cannot directly use JSON Schema to constrain outputs - it relies on prompt engineering with examples
+- **Less flexible**: The need for examples makes it harder to adapt to different schemas dynamically
+
+**Migration Note**: Previously used langextract for extraction, but this has been replaced with structured extraction via PydanticAI. langextract is now only used for visualization (`langextract.visualize()`).
 
 **Alternatives considered**:
 
 - Regex-only approach: Too brittle, doesn't handle variations well
-- LLM-based extraction: Would violate local-only requirement (FR-019), potential for fabrication
-- Custom NLP pipeline: Too complex for v0, langextract provides proven solution
+- langextract: Requires in-context examples and cannot condition on schema directly
+- Custom NLP pipeline: Too complex for v0
 
 ### Similarity Matching: TheFuzz
 
@@ -143,7 +152,7 @@
 - Supports "View source" functionality in UI
 - Critical for audit trail and debugging
 
-**Implementation**: langextract returns spans; map to SourceRef with doc_id, path, location (page/line or char range), snippet, and metadata.
+**Implementation**: PydanticAI extraction returns structured data; use fuzzy matching to locate spans in documents; map to SourceRef with doc_id, path, location (page/line or char range), snippet, and metadata.
 
 ### Consensus Detection Pattern
 

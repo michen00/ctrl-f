@@ -12,7 +12,7 @@
 
 - **Schema-Driven Extraction**: Accept JSON Schema or Pydantic model definitions to specify the structure of data to extract
 - **Multi-Format Document Support**: Process PDF, DOCX, HTML, and TXT files from directories or archives (ZIP, TAR, TAR.GZ)
-- **AI-Powered Field Extraction**: Uses `langextract` to extract candidate values for each schema field with confidence scores
+- **AI-Powered Field Extraction**: Uses PydanticAI with Ollama (default), OpenAI, or Gemini to extract candidate values for each schema field with confidence scores
 - **Intelligent Deduplication**: Groups near-duplicate candidates using fuzzy string matching (`thefuzz`)
 - **Consensus Detection**: Automatically identifies high-confidence values when one candidate significantly outperforms others
 - **Disagreement Detection**: Flags fields where multiple candidates have similar confidence scores, requiring manual review
@@ -223,7 +223,7 @@ src/ctrlf/app/
 ├── models.py          # Pydantic data models (SourceRef, Candidate, FieldResult, etc.)
 ├── schema_io.py       # Schema validation and conversion (JSON Schema ↔ Pydantic)
 ├── ingest.py          # Document conversion to Markdown (markitdown wrapper)
-├── extract.py         # Field extraction using langextract
+├── extract.py         # Field extraction using PydanticAI (Ollama/OpenAI/Gemini)
 ├── aggregate.py       # Candidate deduplication, normalization, consensus detection
 ├── storage.py         # TinyDB adapter for persistent storage
 ├── ui.py              # Gradio interface components
@@ -385,7 +385,8 @@ ctrlf/
 - `gradio>=4.0.0` - Web UI framework
 - `tinydb>=4.8.0` - Local JSON database
 - `markitdown>=0.0.1` - Document to Markdown conversion
-- `langextract>=0.1.0` - Field extraction from documents
+- `pydantic-ai>=0.0.14` - Unified schema-based extraction with Ollama/OpenAI/Gemini
+- `langextract>=0.1.0` - Visualization only (extraction uses PydanticAI)
 - `thefuzz>=0.22.0` - Fuzzy string matching for deduplication
 - `jsonschema>=4.0.0` - JSON Schema validation
 - `structlog>=25.4.0` - Structured logging

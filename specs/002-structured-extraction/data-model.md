@@ -139,7 +139,7 @@ Status of character alignment for an extraction (enum-like string).
 
 This feature uses different models than the existing `extract.py` pipeline:
 
-- **Existing**: `Candidate`, `FieldResult`, `ExtractionResult` (for langextract-based extraction)
+- **Existing**: `Candidate`, `FieldResult`, `ExtractionResult` (used by both extraction pipelines)
 - **New**: `ExtractionRecord`, `JSONLLine` (for structured API extraction)
 
 The two pipelines are independent and can coexist. The new pipeline focuses on JSONL output for visualization, while the existing pipeline focuses on candidate aggregation and consensus detection.

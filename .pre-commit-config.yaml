@@ -74,6 +74,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        args: ["--maxkb=1024"]
       - id: check-ast
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -116,8 +117,10 @@ repos:
           - json_schema_to_pydantic
           - langextract
           - nox[uv]
+          - pydantic-ai
           - pydantic[mypy]
           - pytest
           - python-slugify
-          - types-pyyaml
+          - thefuzz
           - typer
+          - types-pyyaml
