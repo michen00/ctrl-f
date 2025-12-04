@@ -121,12 +121,23 @@ Status of character alignment for an extraction (enum-like string).
 ## Data Flow
 
 1. **Input**: `CorpusDocument` (from `ingest.py`) + JSON Schema (from `schema_io.py`)
-2. **API Call**: Document text + Schema → OpenAI/Gemini API → Structured JSON response
-3. **Flattening**: Structured JSON → Flattened extractions (field_name, value, attributes)
-4. **Character Alignment**: Extraction text + Document text → Character intervals + Alignment status
-5. **Record Creation**: Flattened extractions + Character intervals → `ExtractionRecord` objects
-6. **Line Creation**: `ExtractionRecord` list + Document text + Document ID → `JSONLLine`
-7. **Output**: `JSONLLine` objects → JSONL file → Visualization
+2. **Schema Conversion**: JSON Schema → Pydantic model (via `schema_io.convert_json_schema_to_pydantic()`) - converts JSON Schema draft-07 to Pydantic v2 model for API consumption
+3. **API Call**: Document text (markdown) + Pydantic model (as `output_type`) → PydanticAI Agent → Provider API (Ollama/OpenAI/Gemini) → Structured Pydantic model instance response
+4. **API Response Validation**: Pydantic model instance → Validate schema compliance (types match, required fields present, structure matches schema) - validation performed by PydanticAI at API level, but system MUST verify response is valid
+5. **Response Processing**: Pydantic model instance → Convert to dict → Flatten nested structures (via `_flatten_extractions()`) → Flattened extractions (field_name, value, attributes)
+6. **Character Alignment**: Extraction text + Document text → Fuzzy string matching (via `find_char_interval()`) → Character intervals + Alignment status (match_exact, match_fuzzy, no_match)
+7. **Record Creation**: Flattened extractions + Character intervals + Alignment status → `ExtractionRecord` objects (one per extracted field)
+8. **Line Creation**: `ExtractionRecord` list + Document text (markdown) + Document ID → `JSONLLine` object (one per document)
+9. **Output**: `JSONLLine` objects → JSONL file (one line per document) → Visualization (via `langextract.visualize()`)
+
+**API Response to JSONL Conversion Details**:
+
+- API returns Pydantic model instance (structured dict matching schema)
+- System converts Pydantic model to dict (if not already dict)
+- System flattens nested structures using dot notation (e.g., "person.name", "items.0.value")
+- System creates `ExtractionRecord` for each flattened field with character interval and alignment status
+- System groups `ExtractionRecord` objects into `JSONLLine` with document text and document_id
+- System writes `JSONLLine` objects to JSONL file (one JSON object per line)
 
 ## Integration with Existing Models
 
@@ -146,12 +157,20 @@ The two pipelines are independent and can coexist. The new pipeline focuses on J
 
 ## Validation Points
 
-1. **Before API Call**: Schema validation, API key validation, document text validation
-2. **After API Response**: JSON parsing, schema compliance check
-3. **After Flattening**: Extraction record validation (non-empty fields, valid types)
-4. **After Character Alignment**: Interval validation (within document bounds)
-5. **Before JSONL Write**: `JSONLLine` validation (all required fields, valid document_id)
-6. **Before Visualization**: JSONL file format validation
+1. **Before API Call**: (a) Schema validation (JSON Schema format, compatibility with API capabilities per NFR-004), (b) Schema-to-Pydantic conversion (via `schema_io.convert_json_schema_to_pydantic()`), (c) API key validation (presence, format, precedence order per FR-008), (d) Document text validation (non-empty string), (e) Provider selection validation (valid provider, model string format)
+2. **After API Response**: (a) JSON parsing (if API returns raw JSON, parse to dict), (b) Schema compliance check (response matches Pydantic model structure, types match, required fields present), (c) Pydantic validation (response passes Pydantic model validation - enforced by PydanticAI but verified by system), (d) Response format validation (valid structured data, no parsing errors)
+3. **After Flattening**: Extraction record validation (non-empty field_name and extraction_text, valid attributes dict, valid types)
+4. **After Character Alignment**: Interval validation (start_pos >= 0, end_pos > start_pos, intervals within document bounds, alignment_status is valid value)
+5. **Before JSONL Write**: `JSONLLine` validation (all required fields present: extractions array, text string, document_id string, valid document_id matching input document)
+6. **Before Visualization**: JSONL file format validation (each line is valid JSON, format matches `langextract.visualize()` expectations)
+
+**API Response Error Scenarios**:
+
+- **Invalid JSON**: API returns malformed JSON → Parse error → Skip document, log error, create empty JSONLLine
+- **Schema Mismatch**: API response doesn't match Pydantic model structure → Validation error → Skip document, log error, create empty JSONLLine
+- **Parsing Errors**: JSON parsing fails (syntax errors, encoding issues) → Parse error → Skip document, log error, create empty JSONLLine
+- **Type Mismatch**: API response types don't match schema (e.g., string instead of number) → Pydantic validation error → Skip document, log error, create empty JSONLLine
+- **Missing Required Fields**: API response missing required schema fields → Pydantic validation error → Skip document, log error, create empty JSONLLine
 
 ## Error Handling
 
