@@ -44,7 +44,7 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 - [x] T005 [P] Verify ExtractionRecord model exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T006 [P] Verify JSONLLine model exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T007 [P] Verify find_char_interval function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
-- [x] T008 [P] Verify _flatten_extractions function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
+- [x] T008 [P] Verify \_flatten_extractions function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T009 [P] Verify write_jsonl function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T010 [P] Verify visualize_extractions function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T011 Create API key validation utility in src/ctrlf/app/structured_extract.py for checking OPENAI_API_KEY and GOOGLE_API_KEY environment variables (Ollama doesn't need keys) ✅ **COMPLETE**
@@ -64,22 +64,22 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T013 [P] [US1] Unit test for ExtractionRecord model validation in tests/unit/test_structured_extract.py
-- [ ] T014 [P] [US1] Unit test for JSONLLine model validation in tests/unit/test_structured_extract.py
-- [ ] T015 [P] [US1] Unit test for find_char_interval with exact match in tests/unit/test_structured_extract.py
-- [ ] T016 [P] [US1] Unit test for find_char_interval with fuzzy match in tests/unit/test_structured_extract.py
-- [ ] T017 [P] [US1] Unit test for find_char_interval with no match in tests/unit/test_structured_extract.py
-- [ ] T018 [P] [US1] Unit test for _flatten_extractions with flat schema in tests/unit/test_structured_extract.py
-- [ ] T019 [P] [US1] Unit test for _flatten_extractions with nested objects in tests/unit/test_structured_extract.py
-- [ ] T020 [P] [US1] Unit test for _flatten_extractions with arrays in tests/unit/test_structured_extract.py
-- [ ] T021 [P] [US1] Unit test for _call_structured_extraction_api with Ollama/OpenAI/Gemini (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py
-- [ ] T022 [P] [US1] Unit test for _call_structured_extraction_api error handling (mocked) in tests/unit/test_structured_extract.py
-- [ ] T023 [P] [US1] Unit test for write_jsonl function in tests/unit/test_structured_extract.py
-- [ ] T024 [US1] Integration test for Ollama/OpenAI/Gemini extraction workflow in tests/integration/test_structured_extraction_e2e.py (mocked PydanticAI Agent calls)
+- [x] T013 [P] [US1] Unit test for ExtractionRecord model validation in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T014 [P] [US1] Unit test for JSONLLine model validation in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T015 [P] [US1] Unit test for find_char_interval with exact match in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T016 [P] [US1] Unit test for find_char_interval with fuzzy match in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T017 [P] [US1] Unit test for find_char_interval with no match in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T018 [P] [US1] Unit test for \_flatten_extractions with flat schema in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T019 [P] [US1] Unit test for \_flatten_extractions with nested objects in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T020 [P] [US1] Unit test for \_flatten_extractions with arrays in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T021 [P] [US1] Unit test for \_call_structured_extraction_api with Ollama/OpenAI/Gemini (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T022 [P] [US1] Unit test for \_call_structured_extraction_api error handling (mocked) in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T023 [P] [US1] Unit test for write_jsonl function in tests/unit/test_structured_extract.py ✅ **COMPLETE**
+- [x] T024 [US1] Integration test for Ollama/OpenAI/Gemini extraction workflow in tests/integration/test_structured_extraction_e2e.py (mocked PydanticAI Agent calls) ✅ **COMPLETE**
 
 ### Implementation for User Story 1
 
-- [x] T025 [US1] Implement _call_structured_extraction_api using PydanticAI Agent for Ollama/OpenAI/Gemini providers in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Uses PydanticAI Agent with unified interface
+- [x] T025 [US1] Implement \_call_structured_extraction_api using PydanticAI Agent for Ollama/OpenAI/Gemini providers in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Uses PydanticAI Agent with unified interface
 - [x] T026 [US1] Add provider model string configuration (ollama:model, openai:model, google-gla:model) in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Model strings configured per provider
 - [x] T027 [US1] Add Pydantic model as output_type for structured outputs in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - PydanticAI Agent accepts schema_model as output_type
 - [x] T028 [US1] Add error handling for API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T025) ✅ **COMPLETE** - Retry logic with exponential backoff handles rate limits, timeouts, and server errors
@@ -101,13 +101,13 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T032 [P] [US2] Unit test for _call_structured_extraction_api with Ollama/OpenAI/Gemini providers (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py
+- [ ] T032 [P] [US2] Unit test for \_call_structured_extraction_api with Ollama/OpenAI/Gemini providers (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py
 - [ ] T033 [P] [US2] Unit test for provider-specific error handling (mocked) in tests/unit/test_structured_extract.py
 - [ ] T034 [US2] Integration test for multi-provider extraction workflow in tests/integration/test_structured_extraction_e2e.py (mocked PydanticAI Agent calls)
 
 ### Implementation for User Story 2
 
-- [x] T035 [US2] Add Ollama/OpenAI/Gemini provider support to _call_structured_extraction_api in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - All providers supported via PydanticAI
+- [x] T035 [US2] Add Ollama/OpenAI/Gemini provider support to \_call_structured_extraction_api in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - All providers supported via PydanticAI
 - [x] T036 [US2] Add provider model string configuration (ollama:llama3, openai:gpt-4o, google-gla:gemini-2.5-flash) in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Model strings configured
 - [x] T037 [US2] Add Pydantic model output_type configuration for all providers in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Unified via PydanticAI Agent
 - [x] T038 [US2] Add error handling for provider-specific API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T035) ✅ **COMPLETE** - Generic retry logic handles all providers
@@ -136,7 +136,7 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 ### Implementation for User Story 3
 
 - [x] T045 [US3] Enhance visualize_extractions to handle langextract.visualize() return types in src/ctrlf/app/structured_extract.py (depends on T010) ✅ **COMPLETE** - Handles string, .data attribute, and other return types
-- [x] T046 [US3] Add JSONL format validation before visualization in src/ctrlf/app/structured_extract.py (depends on T009) ✅ **COMPLETE** -_validate_jsonl_format() validates format before visualization
+- [x] T046 [US3] Add JSONL format validation before visualization in src/ctrlf/app/structured_extract.py (depends on T009) ✅ **COMPLETE** -\_validate_jsonl_format() validates format before visualization
 - [x] T047 [US3] Add error handling for visualization failures in src/ctrlf/app/structured_extract.py (depends on T045) ✅ **COMPLETE** - Comprehensive error handling for visualization failures
 - [x] T048 [US3] Verify JSONL output format matches langextract.visualize() expectations in src/ctrlf/app/structured_extract.py (depends on T009) ✅ **COMPLETE** - Validation ensures format matches langextract expectations
 
