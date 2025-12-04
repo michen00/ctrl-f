@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from langextract.data import AnnotatedDocument, Extraction
 from pydantic import BaseModel
 
 from ctrlf.app.extract import (
@@ -16,34 +15,21 @@ from ctrlf.app.ingest import CorpusDocument
 from ctrlf.app.models import ExtractionResult
 
 
-@patch("ctrlf.app.extract.extract")
+@patch("ctrlf.app.structured_extract._call_structured_extraction_api")
 class TestRunExtraction:
     """Test full extraction workflow."""
 
     def test_run_extraction_creates_field_results(
         self,
-        mock_extract: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test that extraction creates FieldResult for each schema field."""
-        # Mock extraction results
-        # We need to return a document with extractions for both fields
-        e1 = MagicMock(spec=Extraction)
-        e1.extraction_class = "name"
-        e1.extraction_text = "Alice"
-        e1.char_start = 6
-        e1.char_end = 11
-
-        e2 = MagicMock(spec=Extraction)
-        e2.extraction_class = "email"
-        e2.extraction_text = "alice@example.com"
-        e2.char_start = 20
-        e2.char_end = 37
-
-        mock_doc = AnnotatedDocument(
-            text="Name: Alice, Email: alice@example.com",
-            extractions=[e1, e2],
-        )
-        mock_extract.return_value = mock_doc
+        # Mock PydanticAI API call to return structured data matching the schema
+        # The API returns a dict matching the Extended Schema model
+        mock_api_call.return_value = {
+            "name": ["Alice"],
+            "email": ["alice@example.com"],
+        }
 
         # Create a simple Extended Schema model
         class TestModel(BaseModel):
@@ -66,24 +52,23 @@ class TestRunExtraction:
         assert result.created_at
         assert result.schema_version
 
-        # Verify extract was called with Ollama parameters
-        mock_extract.assert_called()
-        call_kwargs = mock_extract.call_args.kwargs
-        assert call_kwargs.get("model_id") == "gemma2:2b"
-        assert call_kwargs.get("model_url") == "http://localhost:11434"
-        assert call_kwargs.get("use_schema_constraints") is False
-        assert call_kwargs.get("fence_output") is False
+        # Verify API was called with correct parameters
+        mock_api_call.assert_called_once()
+        call_args = mock_api_call.call_args
+        assert call_args[0][0] == "Name: Alice, Email: alice@example.com"  # text
+        assert call_args[0][1] == TestModel  # schema_model
+        assert call_args.kwargs.get("provider") == "ollama"  # default provider
 
     def test_run_extraction_handles_errors_gracefully(
         self,
-        mock_extract: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test that extraction continues on individual field/document errors."""
-        # Mock extraction to fail for first doc, succeed for second (empty)
-        mock_doc_success = AnnotatedDocument(text="", extractions=[])
-
-        # Side effect: first call raises Exception, second returns empty doc
-        mock_extract.side_effect = [Exception("Extraction failed"), mock_doc_success]
+        # Mock API call to fail for first doc, succeed for second (empty)
+        mock_api_call.side_effect = [
+            RuntimeError("Extraction failed"),
+            {"name": [], "email": []},  # Empty extraction for second doc
+        ]
 
         class TestModel(BaseModel):
             name: list[str]
@@ -104,6 +89,7 @@ class TestRunExtraction:
         result, _instrumentation = run_extraction(TestModel, corpus_docs)
         assert isinstance(result, ExtractionResult)
         assert len(result.results) == 2  # Results for fields exist even if empty
+        assert mock_api_call.call_count == 2  # Called for both documents
 
 
 class TestExtractSnippet:

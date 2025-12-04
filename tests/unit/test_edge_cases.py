@@ -5,10 +5,9 @@ from __future__ import annotations
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock, patch
 
-from langextract.data import AnnotatedDocument, Extraction
 from pydantic import BaseModel
 
 from ctrlf.app.aggregate import aggregate_field_results
@@ -109,53 +108,37 @@ class TestImagesAndTables:
     # These edge cases are now covered by run_extraction tests.
 
 
-@patch("ctrlf.app.extract.extract")
+@patch("ctrlf.app.structured_extract._call_structured_extraction_api")
 class TestSC003RecallMetrics:
     """Test SC-003: Extraction identifies at least 80% of schema fields in documents."""
 
     def test_recall_metric_calculation(
         self,
-        mock_extract: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test that recall can be calculated for extraction results."""
 
         # Mock return values with side effect to simulate different docs
-        def recall_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
-            text = kwargs.get("text_or_documents", "")
-            extractions = []
+        def recall_side_effect(*_args: Any, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+            text = kwargs.get("text", "") or (_args[0] if _args else "")
+            result: dict[str, Any] = {}
             if "Alice" in text:
-                e1 = MagicMock(spec=Extraction)
-                e1.extraction_class = "name"
-                e1.extraction_text = "Alice Smith"
-                e2 = MagicMock(spec=Extraction)
-                e2.extraction_class = "email"
-                e2.extraction_text = "alice@example.com"
-                e3 = MagicMock(spec=Extraction)
-                e3.extraction_class = "phone"
-                e3.extraction_text = "555-1234"
-                e4 = MagicMock(spec=Extraction)
-                e4.extraction_class = "address"
-                e4.extraction_text = "123 Main St"
-                extractions.extend([e1, e2, e3, e4])
+                result = {
+                    "name": ["Alice Smith"],
+                    "email": ["alice@example.com"],
+                    "phone": ["555-1234"],
+                    "address": ["123 Main St"],
+                }
             elif "Bob" in text:
-                e1 = MagicMock(spec=Extraction)
-                e1.extraction_class = "name"
-                e1.extraction_text = "Bob Jones"
-                e2 = MagicMock(spec=Extraction)
-                e2.extraction_class = "email"
-                e2.extraction_text = "bob@example.com"
-                e3 = MagicMock(spec=Extraction)
-                e3.extraction_class = "phone"
-                e3.extraction_text = "555-5678"
-                e4 = MagicMock(spec=Extraction)
-                e4.extraction_class = "company"
-                e4.extraction_text = "Acme Corp"
-                extractions.extend([e1, e2, e3, e4])
-            return AnnotatedDocument(
-                text=text, extractions=cast("list[Extraction]", extractions)
-            )
+                result = {
+                    "name": ["Bob Jones"],
+                    "email": ["bob@example.com"],
+                    "phone": ["555-5678"],
+                    "company": ["Acme Corp"],
+                }
+            return result
 
-        mock_extract.side_effect = recall_side_effect
+        mock_api_call.side_effect = recall_side_effect
 
         # Create a schema with 5 fields
         class TestModel(BaseModel):
@@ -215,39 +198,30 @@ class TestSC003RecallMetrics:
 
     def test_recall_with_partial_field_presence(
         self,
-        mock_extract: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test recall when fields are partially present across documents."""
 
-        def partial_side_effect(*_args: Any, **kwargs: Any) -> AnnotatedDocument:  # noqa: ANN401
-            text = kwargs.get("text_or_documents", "")
-            extractions = []
+        def partial_side_effect(*_args: Any, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+            text = kwargs.get("text", "") or (_args[0] if _args else "")
+            result: dict[str, Any] = {}
             if "Field1" in text:
-                e1 = MagicMock(spec=Extraction)
-                e1.extraction_class = "field1"
-                e1.extraction_text = "value1"
-                e2 = MagicMock(spec=Extraction)
-                e2.extraction_class = "field2"
-                e2.extraction_text = "value2"
-                extractions.extend([e1, e2])
+                result = {
+                    "field1": ["value1"],
+                    "field2": ["value2"],
+                }
             elif "Field3" in text:
-                e3 = MagicMock(spec=Extraction)
-                e3.extraction_class = "field3"
-                e3.extraction_text = "value3"
-                e4 = MagicMock(spec=Extraction)
-                e4.extraction_class = "field4"
-                e4.extraction_text = "value4"
-                extractions.extend([e3, e4])
+                result = {
+                    "field3": ["value3"],
+                    "field4": ["value4"],
+                }
             elif "Field5" in text:
-                e5 = MagicMock(spec=Extraction)
-                e5.extraction_class = "field5"
-                e5.extraction_text = "value5"
-                extractions.extend([e5])
-            return AnnotatedDocument(
-                text=text, extractions=cast("list[Extraction]", extractions)
-            )
+                result = {
+                    "field5": ["value5"],
+                }
+            return result
 
-        mock_extract.side_effect = partial_side_effect
+        mock_api_call.side_effect = partial_side_effect
 
         class TestModel(BaseModel):
             field1: list[str]
