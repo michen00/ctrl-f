@@ -10,20 +10,20 @@
 
 ## Requirement Completeness
 
-- [ ] CHK001 - Are all three provider types (Ollama, OpenAI, Gemini) explicitly specified with their default models? [Completeness, Spec §FR-001, §FR-009]
-- [ ] CHK002 - Are API key configuration methods fully specified with precedence order (UI → env vars → config file)? [Completeness, Spec §FR-008]
-- [ ] CHK003 - Are all error types (rate limits, timeouts, invalid responses, authentication failures) explicitly listed in requirements? [Completeness, Spec §FR-007, Edge Cases]
-- [ ] CHK004 - Are retry logic parameters (max retries, exponential backoff details) quantified in requirements? [Completeness, Spec §NFR-001]
-- [ ] CHK005 - Is the fuzzy matching threshold range and default value explicitly specified? [Completeness, Spec §FR-010]
-- [ ] CHK006 - Are all JSONL output format fields (extractions, text, document_id) documented in requirements? [Completeness, Spec §FR-005, Data Model]
-- [ ] CHK007 - Are all alignment status values (match_exact, match_fuzzy, no_match) explicitly defined? [Completeness, Spec §FR-006, Data Model]
-- [ ] CHK008 - Is the schema flattening strategy for nested structures documented in requirements? [Completeness, Spec §FR-013]
-- [ ] CHK009 - Are token limit detection and document splitting strategies specified in requirements? [Completeness, Spec §NFR-005, Edge Cases]
-- [ ] CHK010 - Are cost tracking/estimation requirements (what to track, how to calculate) specified? [Completeness, Spec §NFR-002]
-- [ ] CHK011 - Is the plurality vote calculation algorithm (most common value) defined in requirements? [Completeness, Spec §FR-017, Spec §NFR-006]
-- [ ] CHK012 - Are backward compatibility requirements explicitly defined (what must remain unchanged)? [Completeness, Spec §FR-015]
-- [ ] CHK013 - Are visualization output options (file save vs string return) specified in requirements? [Completeness, Spec §FR-012]
-- [ ] CHK014 - Are schema validation requirements (when to validate, what to reject) documented? [Completeness, Spec §NFR-004]
+- [x] CHK001 - Are all three provider types (Ollama, OpenAI, Gemini) explicitly specified with their default models? [Completeness, Spec §FR-001, §FR-009] ✅ **ADDRESSED** - FR-009 specifies all three providers with default models
+- [x] CHK002 - Are API key configuration methods fully specified with precedence order (UI → env vars → config file)? [Completeness, Spec §FR-008] ✅ **ADDRESSED** - FR-008 specifies precedence order and config file format
+- [x] CHK003 - Are all error types (rate limits, timeouts, invalid responses, authentication failures) explicitly listed in requirements? [Completeness, Spec §FR-007, Edge Cases] ✅ **ADDRESSED** - FR-007 specifies all error types with behaviors
+- [x] CHK004 - Are retry logic parameters (max retries, exponential backoff details) quantified in requirements? [Completeness, Spec §NFR-001] ✅ **ADDRESSED** - NFR-001 specifies max_retries=3, initial_delay=1.0s, multiplier=2.0
+- [x] CHK005 - Is the fuzzy matching threshold range and default value explicitly specified? [Completeness, Spec §FR-010] ✅ **ADDRESSED** - FR-010 specifies range 0-100, default 80
+- [x] CHK006 - Are all JSONL output format fields (extractions, text, document_id) documented in requirements? [Completeness, Spec §FR-005, Data Model] ✅ **ADDRESSED** - FR-005 specifies all required fields
+- [x] CHK007 - Are all alignment status values (match_exact, match_fuzzy, no_match) explicitly defined? [Completeness, Spec §FR-006, Data Model] ✅ **ADDRESSED** - FR-006 defines all three alignment status values
+- [x] CHK008 - Is the schema flattening strategy for nested structures documented in requirements? [Completeness, Spec §FR-013] ✅ **ADDRESSED** - FR-013 specifies dot notation and index notation for flattening
+- [x] CHK009 - Are token limit detection and document splitting strategies specified in requirements? [Completeness, Spec §NFR-005, Edge Cases] ✅ **ADDRESSED** - NFR-005 and Edge Cases specify token detection and splitting at sentence boundaries
+- [x] CHK010 - Are cost tracking/estimation requirements (what to track, how to calculate) specified? [Completeness, Spec §NFR-002] ✅ **ADDRESSED** - NFR-002 specifies token usage logging with structured fields
+- [x] CHK011 - Is the plurality vote calculation algorithm (most common value) defined in requirements? [Completeness, Spec §FR-017, Spec §NFR-006] ✅ **ADDRESSED** - FR-017 and NFR-006 specify frequency counting and highest count selection
+- [x] CHK012 - Are backward compatibility requirements explicitly defined (what must remain unchanged)? [Completeness, Spec §FR-015] ✅ **ADDRESSED** - FR-015 specifies what must remain unchanged
+- [x] CHK013 - Are visualization output options (file save vs string return) specified in requirements? [Completeness, Spec §FR-012] ✅ **ADDRESSED** - FR-012 specifies both file save and string return options
+- [x] CHK014 - Are schema validation requirements (when to validate, what to reject) documented? [Completeness, Spec §NFR-004] ✅ **ADDRESSED** - NFR-004 specifies validation checks and rejection criteria
 
 ---
 
