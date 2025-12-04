@@ -57,18 +57,287 @@ __all__ = (
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydantic import BaseModel
 from thefuzz import fuzz
 
 from ctrlf.app.logging_conf import get_logger
 from ctrlf.app.models import Candidate, SourceRef
+from ctrlf.app.schema_io import validate_json_schema
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ctrlf.app.ingest import CorpusDocument
 
 logger = get_logger(__name__)
+
+T = TypeVar("T")
+
+
+def estimate_cost(
+    tokens_input: int,
+    tokens_output: int,
+    provider: str,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Estimate cost for API call based on token usage.
+
+    Provides cost estimation for OpenAI and Gemini providers based on published
+    pricing (as of 2024). Ollama is free (local only).
+
+    Args:
+        tokens_input: Number of input tokens
+        tokens_output: Number of output tokens
+        provider: API provider ("ollama", "openai", or "gemini")
+        model: Model name (optional, for more accurate pricing)
+
+    Returns:
+        Dictionary with cost estimation:
+        - total_tokens: Total token count
+        - input_cost: Cost for input tokens (USD)
+        - output_cost: Cost for output tokens (USD)
+        - total_cost: Total cost (USD)
+        - provider: Provider name
+        - model: Model name used
+        - note: Additional notes about pricing
+
+    Note:
+        Pricing is approximate and may vary. Check provider pricing pages for
+        current rates. Ollama returns zero cost (local only).
+    """
+    total_tokens = tokens_input + tokens_output
+
+    # Pricing per 1M tokens (as of 2024, approximate)
+    # OpenAI: https://openai.com/pricing
+    # Gemini: https://ai.google.dev/pricing
+    pricing: dict[str, dict[str, dict[str, float]]] = {
+        "openai": {
+            "gpt-4o": {"input": 2.50, "output": 10.00},  # $2.50/$10 per 1M tokens
+            "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+            "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
+            "default": {"input": 2.50, "output": 10.00},
+        },
+        "gemini": {
+            "gemini-2.5-flash": {
+                "input": 0.075,
+                "output": 0.30,
+            },  # $0.075/$0.30 per 1M tokens
+            "gemini-1.5-pro": {"input": 1.25, "output": 5.00},
+            "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
+            "default": {"input": 0.075, "output": 0.30},
+        },
+        "ollama": {
+            "default": {"input": 0.0, "output": 0.0},  # Free (local only)
+        },
+    }
+
+    if provider == "ollama":
+        return {
+            "total_tokens": total_tokens,
+            "input_cost": 0.0,
+            "output_cost": 0.0,
+            "total_cost": 0.0,
+            "provider": provider,
+            "model": model or "llama3",
+            "note": "Ollama is free (local only, no API costs)",
+        }
+
+    provider_pricing = pricing.get(provider, {})
+    model_name = model or (
+        "gpt-4o"
+        if provider == "openai"
+        else ("gemini-2.5-flash" if provider == "gemini" else "default")
+    )
+    model_pricing = provider_pricing.get(
+        model_name, provider_pricing.get("default", {"input": 0.0, "output": 0.0})
+    )
+
+    # Calculate costs (pricing is per 1M tokens)
+    input_cost = (tokens_input / 1_000_000) * model_pricing["input"]
+    output_cost = (tokens_output / 1_000_000) * model_pricing["output"]
+    total_cost = input_cost + output_cost
+
+    return {
+        "total_tokens": total_tokens,
+        "input_cost": round(input_cost, 6),
+        "output_cost": round(output_cost, 6),
+        "total_cost": round(total_cost, 6),
+        "provider": provider,
+        "model": model_name,
+        "note": (
+            "Pricing is approximate. Check provider pricing pages for current rates."
+        ),
+    }
+
+
+def validate_api_key(provider: str) -> None:
+    """Validate API key for the given provider.
+
+    Checks for required API keys based on provider:
+    - Ollama: No API key required (local only)
+    - OpenAI: Requires OPENAI_API_KEY environment variable
+    - Gemini: Requires GOOGLE_API_KEY environment variable
+
+    Args:
+        provider: API provider ("ollama", "openai", or "gemini")
+
+    Raises:
+        ValueError: If provider is invalid or API key is missing/invalid
+    """
+    import os  # noqa: PLC0415
+
+    if provider == "ollama":
+        # Ollama doesn't need API keys (local only)
+        return
+
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key or not api_key.strip():
+            msg = (
+                "OPENAI_API_KEY environment variable is required for OpenAI provider. "
+                "Set it with: export OPENAI_API_KEY='your-key'"
+            )
+            raise ValueError(msg)
+        # Basic validation: OpenAI keys typically start with "sk-"
+        if not api_key.startswith("sk-"):
+            logger.warning(
+                "OPENAI_API_KEY does not start with 'sk-'. "
+                "This may indicate an invalid key format."
+            )
+
+    elif provider == "gemini":
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key or not api_key.strip():
+            msg = (
+                "GOOGLE_API_KEY environment variable is required for Gemini provider. "
+                "Set it with: export GOOGLE_API_KEY='your-key'"
+            )
+            raise ValueError(msg)
+        # Basic validation: Google API keys are typically long alphanumeric strings
+        if len(api_key) < 20:
+            logger.warning(
+                "GOOGLE_API_KEY appears to be too short. "
+                "This may indicate an invalid key format."
+            )
+
+    else:
+        msg = f"Unsupported provider: {provider}. Supported: ollama, openai, gemini"
+        raise ValueError(msg)
+
+
+def _retry_with_exponential_backoff[T](  # noqa: PLR0913
+    func: Callable[[], T],
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    multiplier: float = 2.0,
+    max_delay: float = 60.0,
+    retryable_errors: tuple[type[Exception], ...] | None = None,
+) -> T:
+    """Retry a function with exponential backoff.
+
+    Handles retryable errors (rate limits, timeouts, server errors) with
+    exponential backoff. Non-retryable errors (authentication, invalid requests)
+    are raised immediately.
+
+    Args:
+        func: Function to retry (callable)
+        max_retries: Maximum number of retry attempts (default: 3)
+        initial_delay: Initial delay in seconds (default: 1.0)
+        multiplier: Multiplier for exponential backoff (default: 2.0)
+        max_delay: Maximum delay in seconds (default: 60.0)
+        retryable_errors: Tuple of exception types to retry on. If None, uses default
+            retryable errors (RateLimitError, TimeoutError, ServerError)
+
+    Returns:
+        Return value from func()
+
+    Raises:
+        Exception: Last exception raised by func() if all retries exhausted
+    """
+    import time  # noqa: PLC0415
+
+    # Default retryable errors: rate limits (429), timeouts, server errors (5xx)
+    # Note: PydanticAI may wrap these in RuntimeError, so we'll check error messages
+    if retryable_errors is None:
+        retryable_errors = (TimeoutError,)
+
+    delay = initial_delay
+    last_exception: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+
+            # Check if error is retryable
+            is_retryable = isinstance(e, retryable_errors)
+
+            # Also check error messages for common retryable patterns
+            error_msg = str(e).lower()
+            if not is_retryable:
+                is_retryable = any(
+                    pattern in error_msg
+                    for pattern in [
+                        "rate limit",
+                        "429",
+                        "timeout",
+                        "timed out",
+                        "server error",
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                    ]
+                )
+
+            # Don't retry on authentication errors (401) or invalid requests (400)
+            if any(
+                pattern in error_msg
+                for pattern in [
+                    "authentication",
+                    "401",
+                    "unauthorized",
+                    "invalid request",
+                    "400",
+                    "bad request",
+                ]
+            ):
+                logger.exception("Non-retryable error (authentication/invalid request)")
+                raise
+
+            # If not retryable or out of retries, raise
+            if not is_retryable or attempt >= max_retries:
+                if attempt >= max_retries:
+                    logger.exception(
+                        "Max retries (%d) exceeded for %s",
+                        max_retries,
+                        func.__name__ if hasattr(func, "__name__") else "function",
+                    )
+                raise
+
+            # Log retry attempt
+            logger.warning(
+                "Retryable error (attempt %d/%d): %s. Retrying in %.1f seconds...",
+                attempt + 1,
+                max_retries,
+                e,
+                delay,
+            )
+
+            # Wait before retry
+            time.sleep(delay)
+
+            # Calculate next delay with exponential backoff
+            delay = min(delay * multiplier, max_delay)
+
+    # Should never reach here, but handle just in case
+    if last_exception:
+        raise last_exception
+    msg = "Retry logic failed unexpectedly"
+    raise RuntimeError(msg)
 
 
 class FlattenedExtraction(NamedTuple):
@@ -226,7 +495,7 @@ def find_char_interval(
     return ({"start_pos": 0, "end_pos": 0}, "no_match")
 
 
-def _call_structured_extraction_api(
+def _call_structured_extraction_api(  # noqa: PLR0915
     text: str,
     schema_model: type[BaseModel],
     provider: str = "ollama",
@@ -236,6 +505,8 @@ def _call_structured_extraction_api(
 
     Uses PydanticAI Agent to extract structured data from text according to the schema.
     Supports Ollama (default), OpenAI, and Gemini providers.
+    Includes API key validation, schema validation, and retry logic with
+    exponential backoff.
 
     Args:
         text: Document text to extract from
@@ -249,9 +520,26 @@ def _call_structured_extraction_api(
         Extracted data as dict matching the schema (validated Pydantic model instance)
 
     Raises:
-        ValueError: If provider is not supported
-        RuntimeError: If extraction fails
+        ValueError: If provider is not supported, API key is missing/invalid,
+            or schema is invalid
+        RuntimeError: If extraction fails after retries
     """
+    # Validate API key before proceeding
+    validate_api_key(provider)
+
+    # Validate schema before API call
+    try:
+        schema_dict = schema_model.model_json_schema()
+        # Validate JSON Schema format (basic validation - Pydantic model
+        # already validates structure)
+        schema_json_str = json.dumps(schema_dict)
+        validate_json_schema(schema_json_str)
+        logger.debug("Schema validation passed for %s", provider)
+    except Exception as e:
+        logger.exception("Schema validation failed")
+        msg = f"Invalid schema: {e}. Please ensure schema is a valid Pydantic model."
+        raise ValueError(msg) from e
+
     try:
         from pydantic_ai import Agent  # noqa: PLC0415
     except ImportError as e:
@@ -279,35 +567,157 @@ def _call_structured_extraction_api(
         msg = f"Unsupported provider: {provider}. Supported: ollama, openai, gemini"
         raise ValueError(msg)
 
-    try:
-        # Create PydanticAI Agent with the Extended Schema as output_type
-        agent = Agent(
-            model_str,
-            output_type=schema_model,
-            system_prompt=(
-                "Extract structured data from the provided document text. "
-                "Return only the extracted data matching the specified schema. "
-                "For array fields, return all matching values found in the document."
-            ),
+    def _execute_extraction() -> dict[str, Any]:
+        """Execute the extraction API call (wrapped for retry logic)."""
+        import time  # noqa: PLC0415
+
+        # Estimate token count (rough estimate: ~4 characters per token)
+        estimated_tokens = len(text) // 4
+        estimated_schema_tokens = len(str(schema_model.model_json_schema())) // 4
+        total_estimated_tokens = estimated_tokens + estimated_schema_tokens
+
+        # Token limits by provider/model (approximate)
+        token_limits: dict[str, dict[str, int]] = {
+            "ollama": {"llama3": 128000, "default": 128000},
+            "openai": {
+                "gpt-4o": 128000,
+                "gpt-4-turbo": 128000,
+                "gpt-3.5-turbo": 16385,
+                "default": 128000,
+            },
+            "gemini": {
+                "gemini-2.5-flash": 1000000,
+                "gemini-1.5-pro": 2000000,
+                "gemini-1.5-flash": 1000000,
+                "default": 1000000,
+            },
+        }
+
+        # Check token limits
+        provider_limits = token_limits.get(provider, {})
+        model_name = model or (
+            "llama3"
+            if provider == "ollama"
+            else ("gpt-4o" if provider == "openai" else "gemini-2.5-flash")
+        )
+        token_limit = provider_limits.get(
+            model_name, provider_limits.get("default", 128000)
         )
 
-        # Run extraction synchronously
-        result = agent.run_sync(text)
+        if total_estimated_tokens > token_limit:
+            logger.warning(
+                "Estimated token count (%d) exceeds limit (%d) for %s. "
+                "Document may be truncated or fail.",
+                total_estimated_tokens,
+                token_limit,
+                model_str,
+            )
 
-        # Convert Pydantic model instance to dict
-        extracted_data = result.output.model_dump()
-
-        logger.debug(
-            "Extracted data for document using %s: %s fields extracted",
+        # Log API call start
+        start_time = time.time()
+        logger.info(
+            "Starting API call with %s (estimated tokens: %d, limit: %d)",
             model_str,
-            len(extracted_data),
+            total_estimated_tokens,
+            token_limit,
+        )
+
+        try:
+            # Create PydanticAI Agent with the Extended Schema as output_type
+            agent = Agent(
+                model_str,
+                output_type=schema_model,
+                system_prompt=(
+                    "Extract structured data from the provided document text. "
+                    "Return only the extracted data matching the specified schema. "
+                    "For array fields, return all matching values found in "
+                    "the document."
+                ),
+            )
+
+            # Run extraction synchronously
+            result = agent.run_sync(text)
+
+            # Calculate response time
+            response_time = time.time() - start_time
+
+            # Extract token usage if available from PydanticAI result
+            # PydanticAI may provide token usage in result.usage or similar
+            tokens_input = (
+                getattr(result, "usage", {}).get("input_tokens", estimated_tokens)
+                if hasattr(result, "usage")
+                else estimated_tokens
+            )
+            tokens_output = (
+                getattr(result, "usage", {}).get(
+                    "output_tokens", estimated_schema_tokens
+                )
+                if hasattr(result, "usage")
+                else estimated_schema_tokens
+            )
+            total_tokens = tokens_input + tokens_output
+
+            # Estimate cost (optional, for logging)
+            cost_estimate = estimate_cost(tokens_input, tokens_output, provider, model)
+
+            # Log API call success with token usage, response time, and cost estimate
+            logger.info(
+                "API call completed successfully with %s: %d fields extracted, "
+                "tokens: %d input + %d output = %d total, response time: %.2fs, "
+                "estimated cost: $%.6f",
+                model_str,
+                len(result.output.model_dump()),
+                tokens_input,
+                tokens_output,
+                total_tokens,
+                response_time,
+                cost_estimate["total_cost"],
+            )
+
+            # Log detailed cost breakdown at debug level
+            logger.debug(
+                "Cost breakdown: input=$%.6f, output=$%.6f, total=$%.6f (%s)",
+                cost_estimate["input_cost"],
+                cost_estimate["output_cost"],
+                cost_estimate["total_cost"],
+                cost_estimate["note"],
+            )
+
+            # Convert Pydantic model instance to dict
+            extracted_data = result.output.model_dump()
+
+            logger.debug(
+                "Extracted data for document using %s: %s fields extracted",
+                model_str,
+                len(extracted_data),
+            )
+        except Exception:
+            # Calculate response time even on error
+            response_time = time.time() - start_time
+            logger.exception(
+                "API call failed with %s after %.2fs",
+                model_str,
+                response_time,
+            )
+            raise
+        else:
+            return extracted_data
+
+    # Execute with retry logic
+    try:
+        return _retry_with_exponential_backoff(
+            _execute_extraction,
+            max_retries=3,
+            initial_delay=1.0,
+            multiplier=2.0,
+            max_delay=60.0,
         )
     except Exception as e:
-        logger.exception("Structured extraction failed with %s", model_str, exc_info=e)
+        logger.exception(
+            "Structured extraction failed with %s after retries", model_str, exc_info=e
+        )
         msg = f"Extraction failed: {e}"
         raise RuntimeError(msg) from e
-    else:
-        return extracted_data
 
 
 def _extraction_record_to_candidate(
@@ -556,11 +966,90 @@ def write_jsonl(
     logger.info("Wrote %d lines to %s", len(jsonl_lines), output_path)
 
 
+def _validate_jsonl_format(jsonl_path: Path) -> None:
+    """Validate JSONL file format before visualization.
+
+    Checks that the JSONL file:
+    1. Exists and is readable
+    2. Contains valid JSON on each line
+    3. Each line has required fields (extractions, text, document_id)
+    4. Format matches langextract.visualize() expectations
+
+    Args:
+        jsonl_path: Path to JSONL file
+
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        ValueError: If file format is invalid
+    """
+    if not jsonl_path.exists():
+        msg = f"JSONL file not found: {jsonl_path}"
+        raise FileNotFoundError(msg)
+
+    if not jsonl_path.is_file():
+        msg = f"Path is not a file: {jsonl_path}"
+        raise ValueError(msg)
+
+    try:
+        with jsonl_path.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        msg = f"Failed to read JSONL file {jsonl_path}: {e}"
+        raise ValueError(msg) from e
+
+    if not lines:
+        logger.warning("JSONL file is empty: %s", jsonl_path)
+        return
+
+    # Validate each line
+    for line_num, raw_line in enumerate(lines, start=1):
+        line_content = raw_line.strip()
+        if not line_content:
+            continue  # Skip empty lines
+
+        try:
+            data = json.loads(line_content)
+        except json.JSONDecodeError as e:
+            msg = f"Invalid JSON on line {line_num} of {jsonl_path}: {e}"
+            raise ValueError(msg) from e
+
+        # Check required fields for langextract.visualize() compatibility
+        required_fields = ["extractions", "text", "document_id"]
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            msg = (
+                f"Missing required fields on line {line_num} of {jsonl_path}: "
+                f"{missing_fields}. Required: {required_fields}"
+            )
+            raise ValueError(msg)
+
+        # Validate field types
+        if not isinstance(data.get("extractions"), list):
+            msg = f"'extractions' must be a list on line {line_num} of {jsonl_path}"
+            raise TypeError(msg)
+
+        if not isinstance(data.get("text"), str):
+            msg = f"'text' must be a string on line {line_num} of {jsonl_path}"
+            raise TypeError(msg)
+
+        if not isinstance(data.get("document_id"), str):
+            msg = f"'document_id' must be a string on line {line_num} of {jsonl_path}"
+            raise TypeError(msg)
+
+    logger.debug(
+        "JSONL format validation passed for %s (%d lines)", jsonl_path, len(lines)
+    )
+
+
 def visualize_extractions(
     jsonl_path: str | Path,
     output_html_path: str | Path | None = None,
 ) -> str:
     """Visualize extractions from JSONL file using langextract.
+
+    Validates JSONL format before visualization and handles various return types
+    from langextract.visualize(). Includes comprehensive error handling for
+    visualization failures.
 
     Args:
         jsonl_path: Path to input JSONL file
@@ -573,31 +1062,79 @@ def visualize_extractions(
     Raises:
         ImportError: If langextract is not available
         FileNotFoundError: If jsonl_path doesn't exist
+        ValueError: If JSONL format is invalid or visualization fails
+        PermissionError: If output file cannot be written
     """
+    jsonl_path = Path(jsonl_path)
+
+    # Validate JSONL format before visualization
+    try:
+        _validate_jsonl_format(jsonl_path)
+    except (FileNotFoundError, ValueError, TypeError):
+        logger.exception("JSONL validation failed")
+        raise
+
     try:
         import langextract as lx  # noqa: PLC0415
     except ImportError as e:
-        msg = "langextract is required for visualization"
+        msg = (
+            "langextract is required for visualization. "
+            "Install with: uv add langextract (or pip install langextract)"
+        )
         raise ImportError(msg) from e
 
-    jsonl_path = Path(jsonl_path)
-    if not jsonl_path.exists():
-        msg = f"JSONL file not found: {jsonl_path}"
-        raise FileNotFoundError(msg)
+    try:
+        # Use langextract's visualize function
+        logger.info("Generating visualization from %s", jsonl_path)
+        html_content = lx.visualize(str(jsonl_path))
 
-    # Use langextract's visualize function
-    html_content = lx.visualize(str(jsonl_path))
+        # Handle different return types from langextract
+        # langextract may return:
+        # 1. A string directly
+        # 2. A Jupyter display object with .data attribute
+        # 3. An object with HTML content in various attributes
+        html_str: str
+        if isinstance(html_content, str):
+            html_str = html_content
+        elif hasattr(html_content, "data"):
+            html_str = str(html_content.data)
+        elif hasattr(html_content, "html"):
+            html_str = str(html_content.html)
+        else:
+            # Fallback: convert to string
+            html_str = str(html_content)
 
-    # Handle different return types from langextract
-    # langextract may return a Jupyter display object with .data attribute or a string
-    html_str = getattr(html_content, "data", None) or str(html_content)
+        def _validate_html_content(content: str) -> None:
+            """Validate HTML content is not empty."""
+            if not content or not content.strip():
+                msg = "langextract.visualize() returned empty HTML content"
+                raise ValueError(msg)  # noqa: TRY301
+
+        _validate_html_content(html_str)
+
+        logger.info(
+            "Visualization generated successfully (%d characters)", len(html_str)
+        )
+
+    except Exception as e:
+        logger.exception("Visualization failed for %s", jsonl_path)
+        msg = f"Visualization failed: {e}"
+        raise ValueError(msg) from e
 
     # Write to file if output path provided
     if output_html_path:
-        output_path = Path(output_html_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with output_path.open("w", encoding="utf-8") as f:
-            f.write(html_str)
-        logger.info("Wrote visualization to %s", output_path)
+        try:
+            output_path = Path(output_html_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with output_path.open("w", encoding="utf-8") as f:
+                f.write(html_str)
+            logger.info("Wrote visualization to %s", output_path)
+        except PermissionError:
+            logger.exception("Permission denied writing to %s", output_path)
+            raise
+        except OSError as e:
+            logger.exception("Failed to write visualization to %s", output_path)
+            msg = f"Failed to write visualization file: {e}"
+            raise ValueError(msg) from e
 
     return html_str

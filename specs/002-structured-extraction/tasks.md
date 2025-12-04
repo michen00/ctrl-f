@@ -47,8 +47,8 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 - [x] T008 [P] Verify _flatten_extractions function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T009 [P] Verify write_jsonl function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T010 [P] Verify visualize_extractions function exists in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
-- [ ] T011 Create API key validation utility in src/ctrlf/app/structured_extract.py for checking OPENAI_API_KEY and GOOGLE_API_KEY environment variables (Ollama doesn't need keys)
-- [ ] T012 Create retry logic helper function with exponential backoff in src/ctrlf/app/structured_extract.py (max_retries=3, handles 429, 5xx, timeouts)
+- [x] T011 Create API key validation utility in src/ctrlf/app/structured_extract.py for checking OPENAI_API_KEY and GOOGLE_API_KEY environment variables (Ollama doesn't need keys) ✅ **COMPLETE**
+- [x] T012 Create retry logic helper function with exponential backoff in src/ctrlf/app/structured_extract.py (max_retries=3, handles 429, 5xx, timeouts) ✅ **COMPLETE**
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -82,10 +82,10 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 - [x] T025 [US1] Implement _call_structured_extraction_api using PydanticAI Agent for Ollama/OpenAI/Gemini providers in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Uses PydanticAI Agent with unified interface
 - [x] T026 [US1] Add provider model string configuration (ollama:model, openai:model, google-gla:model) in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Model strings configured per provider
 - [x] T027 [US1] Add Pydantic model as output_type for structured outputs in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - PydanticAI Agent accepts schema_model as output_type
-- [ ] T028 [US1] Add error handling for API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T025)
+- [x] T028 [US1] Add error handling for API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T025) ✅ **COMPLETE** - Retry logic with exponential backoff handles rate limits, timeouts, and server errors
 - [x] T029 [US1] Implement run_structured_extraction with provider support in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Supports Ollama (default), OpenAI, Gemini
-- [ ] T030 [US1] Add token limit detection and handling in src/ctrlf/app/structured_extract.py (depends on T025)
-- [ ] T031 [US1] Add logging for API calls (token usage, response times) in src/ctrlf/app/structured_extract.py (depends on T025)
+- [x] T030 [US1] Add token limit detection and handling in src/ctrlf/app/structured_extract.py (depends on T025) ✅ **COMPLETE** - Token estimation and limit checking before API calls
+- [x] T031 [US1] Add logging for API calls (token usage, response times) in src/ctrlf/app/structured_extract.py (depends on T025) ✅ **COMPLETE** - Structured logging with token usage and response times
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -110,10 +110,10 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 - [x] T035 [US2] Add Ollama/OpenAI/Gemini provider support to _call_structured_extraction_api in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - All providers supported via PydanticAI
 - [x] T036 [US2] Add provider model string configuration (ollama:llama3, openai:gpt-4o, google-gla:gemini-2.5-flash) in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Model strings configured
 - [x] T037 [US2] Add Pydantic model output_type configuration for all providers in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Unified via PydanticAI Agent
-- [ ] T038 [US2] Add error handling for provider-specific API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T035)
+- [x] T038 [US2] Add error handling for provider-specific API errors (rate limits, timeouts, invalid responses) in src/ctrlf/app/structured_extract.py (depends on T012, T035) ✅ **COMPLETE** - Generic retry logic handles all providers
 - [x] T039 [US2] Add provider selection logic to run_structured_extraction in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Provider parameter with Ollama default
-- [ ] T040 [US2] Add token limit detection and handling for all providers in src/ctrlf/app/structured_extract.py (depends on T035)
-- [ ] T041 [US2] Add logging for provider API calls (token usage, response times) in src/ctrlf/app/structured_extract.py (depends on T035)
+- [x] T040 [US2] Add token limit detection and handling for all providers in src/ctrlf/app/structured_extract.py (depends on T035) ✅ **COMPLETE** - Token limits configured for all providers
+- [x] T041 [US2] Add logging for provider API calls (token usage, response times) in src/ctrlf/app/structured_extract.py (depends on T035) ✅ **COMPLETE** - Logging works for all providers
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -135,10 +135,10 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] Enhance visualize_extractions to handle langextract.visualize() return types in src/ctrlf/app/structured_extract.py (depends on T010)
-- [ ] T046 [US3] Add JSONL format validation before visualization in src/ctrlf/app/structured_extract.py (depends on T009)
-- [ ] T047 [US3] Add error handling for visualization failures in src/ctrlf/app/structured_extract.py (depends on T045)
-- [ ] T048 [US3] Verify JSONL output format matches langextract.visualize() expectations in src/ctrlf/app/structured_extract.py (depends on T009)
+- [x] T045 [US3] Enhance visualize_extractions to handle langextract.visualize() return types in src/ctrlf/app/structured_extract.py (depends on T010) ✅ **COMPLETE** - Handles string, .data attribute, and other return types
+- [x] T046 [US3] Add JSONL format validation before visualization in src/ctrlf/app/structured_extract.py (depends on T009) ✅ **COMPLETE** -_validate_jsonl_format() validates format before visualization
+- [x] T047 [US3] Add error handling for visualization failures in src/ctrlf/app/structured_extract.py (depends on T045) ✅ **COMPLETE** - Comprehensive error handling for visualization failures
+- [x] T048 [US3] Verify JSONL output format matches langextract.visualize() expectations in src/ctrlf/app/structured_extract.py (depends on T009) ✅ **COMPLETE** - Validation ensures format matches langextract expectations
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -157,9 +157,9 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T049 [P] Add comprehensive error messages for API key missing/invalid scenarios in src/ctrlf/app/structured_extract.py (Ollama doesn't need keys)
-- [ ] T050 [P] Add schema validation before API calls in src/ctrlf/app/structured_extract.py
-- [ ] T051 [P] Add cost estimation helpers (optional, log token usage) in src/ctrlf/app/structured_extract.py
+- [x] T049 [P] Add comprehensive error messages for API key missing/invalid scenarios in src/ctrlf/app/structured_extract.py (Ollama doesn't need keys) ✅ **COMPLETE** - validate_api_key() provides comprehensive error messages
+- [x] T050 [P] Add schema validation before API calls in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - Schema validation added before API calls using validate_json_schema()
+- [x] T051 [P] Add cost estimation helpers (optional, log token usage) in src/ctrlf/app/structured_extract.py ✅ **COMPLETE** - estimate_cost() helper function with logging
 - [x] T052 [P] Add documentation strings to all functions in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T053 [P] Update module docstring in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
 - [x] T054 [P] Add type hints to all functions in src/ctrlf/app/structured_extract.py ✅ **COMPLETE**
