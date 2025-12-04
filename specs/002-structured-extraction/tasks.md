@@ -101,9 +101,9 @@ description: "Task list for Structured Extraction with OpenAI/Gemini API Integra
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T032 [P] [US2] Unit test for \_call_structured_extraction_api with Ollama/OpenAI/Gemini providers (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py
-- [ ] T033 [P] [US2] Unit test for provider-specific error handling (mocked) in tests/unit/test_structured_extract.py
-- [ ] T034 [US2] Integration test for multi-provider extraction workflow in tests/integration/test_structured_extraction_e2e.py (mocked PydanticAI Agent calls)
+- [x] T032 [P] [US2] Unit test for \_call_structured_extraction_api with Ollama/OpenAI/Gemini providers (mocked PydanticAI Agent) in tests/unit/test_structured_extract.py ✅ **COMPLETE** - TestProviderSpecificBehavior tests model string configuration
+- [x] T033 [P] [US2] Unit test for provider-specific error handling (mocked) in tests/unit/test_structured_extract.py ✅ **COMPLETE** - TestProviderSpecificErrorHandling tests API key validation and error messages per provider
+- [x] T034 [US2] Integration test for multi-provider extraction workflow in tests/integration/test_structured_extraction_e2e.py (mocked PydanticAI Agent calls) ✅ **COMPLETE** - test_multi_provider_workflow exists
 
 ### Implementation for User Story 2
 

@@ -690,3 +690,197 @@ class TestValidateAPIKey:
         """Test validate_api_key with invalid provider."""
         with pytest.raises(ValueError, match="Unsupported provider"):
             validate_api_key("invalid_provider")
+
+
+class TestProviderSpecificBehavior:
+    """Test provider-specific behavior for User Story 2 (T032)."""
+
+    @patch("pydantic_ai.Agent")
+    def test_call_structured_extraction_api_provider_model_strings(
+        self, mock_agent_class: MagicMock
+    ) -> None:
+        """Test that correct model strings are used for each provider (T032)."""
+        mock_agent_instance = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output.model_dump.return_value = {"character": ["test"]}
+        mock_agent_instance.run_sync.return_value = mock_result
+        mock_agent_class.return_value = mock_agent_instance
+
+        class TestSchema(BaseModel):
+            character: list[str]
+
+        text = "Test text"
+
+        # Test Ollama with default model
+        _call_structured_extraction_api(
+            text=text, schema_model=TestSchema, provider="ollama", model=None
+        )
+        # Verify Agent was called with correct model string
+        assert mock_agent_class.called
+        # Agent is called with model_str as first positional argument
+        call_args = mock_agent_class.call_args
+        assert call_args[0][0] == "ollama:llama3"
+
+        mock_agent_class.reset_mock()
+
+        # Test OpenAI with default model
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test123"}):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="openai", model=None
+            )
+            call_args = mock_agent_class.call_args
+            assert call_args[0][0] == "openai:gpt-4o"
+
+        mock_agent_class.reset_mock()
+
+        # Test Gemini with default model
+        with patch.dict(
+            os.environ, {"GOOGLE_API_KEY": "test_google_key_12345678901234567890"}
+        ):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="gemini", model=None
+            )
+            call_args = mock_agent_class.call_args
+            assert call_args[0][0] == "google-gla:gemini-2.5-flash"
+
+    @patch("pydantic_ai.Agent")
+    def test_call_structured_extraction_api_custom_models(
+        self, mock_agent_class: MagicMock
+    ) -> None:
+        """Test that custom models are used when provided (T032)."""
+        mock_agent_instance = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output.model_dump.return_value = {"character": ["test"]}
+        mock_agent_instance.run_sync.return_value = mock_result
+        mock_agent_class.return_value = mock_agent_instance
+
+        class TestSchema(BaseModel):
+            character: list[str]
+
+        text = "Test text"
+
+        # Test Ollama with custom model
+        _call_structured_extraction_api(
+            text=text, schema_model=TestSchema, provider="ollama", model="llama3.2"
+        )
+        call_args = mock_agent_class.call_args
+        assert call_args[0][0] == "ollama:llama3.2"
+
+        mock_agent_class.reset_mock()
+
+        # Test OpenAI with custom model
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test123"}):
+            _call_structured_extraction_api(
+                text=text,
+                schema_model=TestSchema,
+                provider="openai",
+                model="gpt-4-turbo",
+            )
+            call_args = mock_agent_class.call_args
+            assert call_args[0][0] == "openai:gpt-4-turbo"
+
+        mock_agent_class.reset_mock()
+
+        # Test Gemini with custom model
+        with patch.dict(
+            os.environ, {"GOOGLE_API_KEY": "test_google_key_12345678901234567890"}
+        ):
+            _call_structured_extraction_api(
+                text=text,
+                schema_model=TestSchema,
+                provider="gemini",
+                model="gemini-2.0-flash-exp",
+            )
+            call_args = mock_agent_class.call_args
+            assert call_args[0][0] == "google-gla:gemini-2.0-flash-exp"
+
+
+class TestProviderSpecificErrorHandling:
+    """Test provider-specific error handling for User Story 2 (T033)."""
+
+    @patch("pydantic_ai.Agent")
+    def test_provider_specific_api_key_validation(
+        self, mock_agent_class: MagicMock
+    ) -> None:
+        """Test API key validation per provider (T033)."""
+
+        class TestSchema(BaseModel):
+            character: list[str]
+
+        text = "Test text"
+
+        # Ollama doesn't require API key
+        mock_agent_instance = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output.model_dump.return_value = {"character": ["test"]}
+        mock_agent_instance.run_sync.return_value = mock_result
+        mock_agent_class.return_value = mock_agent_instance
+
+        # Should work without API key
+        with patch.dict(os.environ, {}, clear=True):
+            result = _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="ollama"
+            )
+            assert result == {"character": ["test"]}
+
+        # OpenAI requires API key
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="OPENAI_API_KEY"),
+        ):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="openai"
+            )
+
+        # Gemini requires API key
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="GOOGLE_API_KEY"),
+        ):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="gemini"
+            )
+
+    def test_provider_specific_error_messages(self) -> None:
+        """Test that error messages are provider-specific (T033)."""
+
+        class TestSchema(BaseModel):
+            character: list[str]
+
+        text = "Test text"
+
+        # Test OpenAI API key error message
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="OPENAI_API_KEY") as exc_info,
+        ):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="openai"
+            )
+        assert "openai" in str(exc_info.value).lower()
+
+        # Test Gemini API key error message
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="GOOGLE_API_KEY") as exc_info,
+        ):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="gemini"
+            )
+        assert (
+            "gemini" in str(exc_info.value).lower()
+            or "google" in str(exc_info.value).lower()
+        )
+
+    def test_provider_specific_unsupported_provider_error(self) -> None:
+        """Test error handling for unsupported providers (T033)."""
+
+        class TestSchema(BaseModel):
+            character: list[str]
+
+        text = "Test text"
+
+        with pytest.raises(ValueError, match="Unsupported provider"):
+            _call_structured_extraction_api(
+                text=text, schema_model=TestSchema, provider="invalid_provider"
+            )
