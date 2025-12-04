@@ -675,19 +675,28 @@ def _process_corpus_input(  # noqa: PLR0915
     return corpus_docs
 
 
-def _run_extraction_step(
+def _run_extraction_step(  # noqa: PLR0913
     model_class: type[BaseModel],
     corpus_docs: list[Any],
     actual_progress: gr.Progress | NoOpProgress,
     progress_messages: list[str],
+    provider: str = "ollama",
+    model_name: str | None = None,
+    fuzzy_threshold: int = 80,
 ) -> tuple[ExtractionResult, PrePromptInstrumentation]:
-    """Run the extraction step.
+    """Run the extraction step using structured extraction (primary method).
+
+    Uses run_extraction which internally uses structured extraction via PydanticAI.
+    Supports Ollama (default), OpenAI, and Gemini providers.
 
     Args:
         model_class: Extended Pydantic model class
         corpus_docs: List of corpus documents
         actual_progress: Progress tracker
         progress_messages: List to append progress messages to
+        provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
+        model_name: Model name (optional, uses provider default if None)
+        fuzzy_threshold: Fuzzy matching threshold (0-100, default: 80)
 
     Returns:
         Tuple of (extraction_result, instrumentation)
@@ -695,8 +704,8 @@ def _run_extraction_step(
     Raises:
         KeyboardInterrupt: If operation is cancelled
     """
-    actual_progress(0.6, desc="Running extraction...")
-    progress_messages.append("Running extraction...")
+    actual_progress(0.6, desc=f"Running extraction with {provider}...")
+    progress_messages.append(f"Running extraction with {provider}...")
 
     # Check for cancellation before starting extraction
     cancel_result = _check_cancellation(actual_progress, progress_messages)
@@ -704,8 +713,16 @@ def _run_extraction_step(
         msg = "Operation cancelled by user"
         raise KeyboardInterrupt(msg)
 
-    # Run extraction
-    extraction_result, instrumentation = run_extraction(model_class, corpus_docs)
+    # Run extraction using structured extraction (primary method)
+    # run_extraction internally uses _call_structured_extraction_api
+    # from structured_extract.py
+    extraction_result, instrumentation = run_extraction(
+        model_class,
+        corpus_docs,
+        provider=provider,
+        model_name=model_name,
+        fuzzy_threshold=fuzzy_threshold,
+    )
 
     actual_progress(0.95, desc="Extraction complete. Finalizing...")
     progress_messages.append("Extraction complete.")
@@ -811,6 +828,34 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 label="Confidence Threshold",
             )
 
+        # Structured extraction options (primary extraction method)
+        with gr.Accordion("Extraction Options", open=False):
+            provider = gr.Radio(
+                choices=["ollama", "openai", "gemini"],
+                value="ollama",
+                label="Provider",
+                info="Ollama (local, default), OpenAI, or Gemini",
+            )
+            model_name = gr.Textbox(
+                label="Model Name (Optional)",
+                placeholder=(
+                    "Leave empty to use provider default "
+                    "(e.g., llama3, gpt-4o, gemini-2.5-flash)"
+                ),
+                info=(
+                    "Provider defaults: Ollama=llama3, "
+                    "OpenAI=gpt-4o, Gemini=gemini-2.5-flash"
+                ),
+            )
+            fuzzy_threshold = gr.Slider(
+                minimum=0,
+                maximum=100,
+                value=80,
+                step=5,
+                label="Fuzzy Matching Threshold",
+                info="Minimum similarity score (0-100) for fuzzy string matching",
+            )
+
         run_button = gr.Button("Run Extraction", variant="primary")
         progress_output = gr.Textbox(
             label="Progress",
@@ -840,6 +885,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
+            _provider: str,
+            _model_name: str | None,
+            _fuzzy_threshold: int,
             progress: gr.Progress | None = None,
         ) -> tuple[ExtractionWorkflowResult, PrePromptInstrumentation]:
             """Run the extraction workflow.
@@ -851,6 +899,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
                 _confidence: Confidence threshold (unused in v0)
+                _provider: API provider ("ollama", "openai", or "gemini")
+                _model_name: Model name (optional, uses provider default if empty)
+                _fuzzy_threshold: Fuzzy matching threshold (0-100)
                 progress: Gradio progress tracker for progress bars and cancellation
 
             Returns:
@@ -882,8 +933,17 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 )
 
                 # Step 3: Run extraction (60-100%)
+                # Use structured extraction as primary method (via run_extraction)
                 extraction_result, instrumentation = _run_extraction_step(
-                    model_class, corpus_docs, actual_progress, progress_messages
+                    model_class,
+                    corpus_docs,
+                    actual_progress,
+                    progress_messages,
+                    provider=_provider,
+                    model_name=_model_name.strip()
+                    if _model_name and _model_name.strip()
+                    else None,
+                    fuzzy_threshold=_fuzzy_threshold,
                 )
 
                 progress_msg = "\n".join(progress_messages)
@@ -1042,6 +1102,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             corpus_dir_path: str | None,
             _null_policy_str: str,
             _confidence: float,
+            _provider: str,
+            _model_name: str | None,
+            _fuzzy_threshold: int,
             progress: gr.Progress | None = None,
         ) -> UnpackedExtractionResult:
             """Wrapper to run extraction workflow and unpack result.
@@ -1053,6 +1116,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 corpus_dir_path: Text input path to corpus directory or file
                 _null_policy_str: Null policy setting (unused in v0)
                 _confidence: Confidence threshold (unused in v0)
+                _provider: API provider ("ollama", "openai", or "gemini")
+                _model_name: Model name (optional, uses provider default if empty)
+                _fuzzy_threshold: Fuzzy matching threshold (0-100)
                 progress: Gradio progress tracker
 
             Returns:
@@ -1065,6 +1131,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 corpus_dir_path,
                 _null_policy_str,
                 _confidence,
+                _provider,
+                _model_name,
+                _fuzzy_threshold,
                 progress,
             )
             return unpack_result(result, instrumentation)
@@ -1078,6 +1147,9 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 corpus_dir,
                 null_policy,
                 confidence_threshold,
+                provider,
+                model_name,
+                fuzzy_threshold,
             ],
             outputs=[
                 progress_output,
