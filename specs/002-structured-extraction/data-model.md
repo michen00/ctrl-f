@@ -15,8 +15,8 @@ Represents a single extraction with character interval information for JSONL out
 - `extraction_text: str` - The extracted text value
 - `char_interval: Dict[str, int]` - Character position interval in the document `{"start_pos": int, "end_pos": int}`
 - `alignment_status: str` - Status of alignment: `"match_exact"`, `"match_fuzzy"`, or `"no_match"`
-- `extraction_index: int` - Index of this extraction in the sequence (1-based)
-- `group_index: int` - Group index for related extractions (for grouping related fields)
+- `extraction_index: int` - Index of this extraction in the sequence (1-based, per-document)
+- `group_index: int` - Group index for related extractions (for grouping related fields). Default value is 0 for the first extraction, increments with each extraction in the document (0-based index from extraction sequence)
 - `description: str | None` - Optional description (currently unused, reserved for future use)
 - `attributes: Dict[str, Any] | None` - Optional additional attributes (e.g., array index, nested field path)
 
@@ -49,13 +49,13 @@ Represents a single line in the JSONL output file, containing all extractions fo
 
 - `extractions: List[ExtractionRecord]` - List of extractions for this document
 - `text: str` - The full document text (markdown format)
-- `document_id: str` - Unique identifier for the document (from `CorpusDocument.doc_id`)
+- `document_id: str` - Unique identifier for the document (from `CorpusDocument.doc_id`). Format: MD5 hexadecimal hash (32 lowercase hex characters) generated from the file path. Example: `"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"`
 
 **Validation Rules**:
 
 - `extractions` can be empty (no extractions found)
 - `text` must be non-empty (document content)
-- `document_id` must be non-empty and match a valid document ID
+- `document_id` must be non-empty, match a valid document ID, and be a 32-character hexadecimal string (MD5 hash format)
 
 **Relationships**:
 
@@ -144,6 +144,7 @@ Status of character alignment for an extraction (enum-like string).
 ### Reused from Existing Codebase
 
 - **`CorpusDocument`** (from `ingest.py`): Input document with `doc_id`, `markdown`, `source_map`
+  - `doc_id`: Generated via MD5 hash of file path (32-character hex string) for stable, unique identifiers
 - **Schema models** (from `schema_io.py`): JSON Schema or Pydantic models for extraction
 
 ### Relationship to Existing Extraction Models
@@ -178,3 +179,16 @@ The two pipelines are independent and can coexist. The new pipeline focuses on J
 - **Parsing Errors**: Logged, document skipped, empty `JSONLLine` created
 - **Alignment Errors**: Marked as `"no_match"`, extraction still included with {0, 0} interval
 - **Validation Errors**: Logged, document skipped, error message in logs
+
+### Error Metadata Structure
+
+When an error occurs and an empty `JSONLLine` is created, error information is stored in the `extractions` array as a special error record (if supported) or logged separately. Error metadata includes:
+
+- **Error Type**: Type of error (e.g., `"rate_limit"`, `"timeout"`, `"parsing_error"`, `"validation_error"`, `"api_error"`, `"conversion_failure"`)
+- **Error Message**: Human-readable error message describing what went wrong
+- **Document ID**: The document identifier where the error occurred
+- **Provider**: API provider name (e.g., `"ollama"`, `"openai"`, `"gemini"`)
+- **Retry Attempt**: Number of retry attempts made (if applicable, 0-indexed)
+- **Timestamp**: When the error occurred (ISO 8601 format)
+
+**Note**: In the current implementation, errors are primarily logged via structured logging rather than stored in the JSONLLine structure. Empty `JSONLLine` objects are created with empty `extractions` arrays, and error details are logged separately. Future versions may include error metadata directly in the JSONLLine structure.

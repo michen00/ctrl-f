@@ -30,11 +30,11 @@
 - [x] CHK013 - Are character intervals clearly defined (0-based, exclusive end position, interval notation)? [Clarity, Data Model §Character Interval, Spec §FR-004] ✅ **ADDRESSED** - data-model.md lines 102-103 and spec.md FR-004 specify 0-based, exclusive end position
 - [x] CHK014 - Is alignment_status clearly defined (when each value applies, how determined)? [Clarity, Data Model §Alignment Status, Spec §FR-006] ✅ **ADDRESSED** - data-model.md lines 117-119 define when each value applies
 - [x] CHK015 - Is extraction_index clearly defined (1-based, sequence order, per-document or per-corpus)? [Clarity, Data Model §ExtractionRecord] ✅ **ADDRESSED** - data-model.md line 18 specifies "1-based" and "sequence order"; implementation shows per-document (structured_extract.py line 507: idx+1 per document)
-- [ ] CHK016 - Is group_index clearly defined (purpose, when used, default value)? [Clarity, Data Model §ExtractionRecord] ⚠️ **PARTIAL** - data-model.md line 19 mentions "for grouping related fields" but doesn't specify default value (implementation shows default is 0 for first extraction)
+- [x] CHK016 - Is group_index clearly defined (purpose, when used, default value)? [Clarity, Data Model §ExtractionRecord] ✅ **ADDRESSED** - data-model.md now specifies default value (0 for first extraction) and increment behavior
 - [x] CHK017 - Are attributes clearly defined (what information stored, when used, examples)? [Clarity, Data Model §ExtractionRecord] ✅ **ADDRESSED** - data-model.md line 21 provides examples (array index, nested field path)
 - [x] CHK018 - Is description field clearly defined (purpose, when used, reserved for future use)? [Clarity, Data Model §ExtractionRecord] ✅ **ADDRESSED** - data-model.md line 20 specifies "currently unused, reserved for future use"
 - [x] CHK019 - Is JSONLLine.text clearly defined (markdown format, full document, not excerpt)? [Clarity, Data Model §JSONLLine] ✅ **ADDRESSED** - data-model.md line 51 specifies "full document text (markdown format)"
-- [ ] CHK020 - Is document_id clearly defined (source, uniqueness, format requirements)? [Clarity, Data Model §JSONLLine] ⚠️ **PARTIAL** - data-model.md line 52 specifies source (from CorpusDocument.doc_id) and uniqueness mentioned in validation, but format requirements not explicitly documented
+- [x] CHK020 - Is document_id clearly defined (source, uniqueness, format requirements)? [Clarity, Data Model §JSONLLine] ✅ **ADDRESSED** - data-model.md now specifies format (MD5 hex, 32 chars), generation method, and validation requirements
 
 ---
 
@@ -117,7 +117,7 @@
 ## Error Handling Integration
 
 - [x] CHK062 - Are error handling requirements consistent with data model structure (empty JSONLLine for errors)? [Consistency, Spec §FR-007, Data Model §Error Handling] ✅ **ADDRESSED** - spec.md FR-007 and data-model.md lines 177-178 specify empty JSONLLine for errors
-- [ ] CHK063 - Are error metadata requirements specified (what information stored in error JSONLLine)? [Completeness, Spec §FR-007, Data Model §JSONLLine] ⚠️ **PARTIAL** - spec.md FR-007 mentions "error metadata" but doesn't specify what fields are stored
+- [x] CHK063 - Are error metadata requirements specified (what information stored in error JSONLLine)? [Completeness, Spec §FR-007, Data Model §JSONLLine] ✅ **ADDRESSED** - data-model.md now specifies error metadata structure with field names (error_type, error_message, document_id, provider, retry_attempt, timestamp) and notes current implementation approach
 - [x] CHK064 - Are validation error handling requirements consistent with API error handling (skip document, empty JSONLLine)? [Consistency, Data Model §Error Handling, Spec §FR-007] ✅ **ADDRESSED** - Both specify skip document and empty JSONLLine
 - [x] CHK065 - Are parsing error handling requirements consistent with data model structure (empty JSONLLine)? [Consistency, Data Model §Error Handling, Edge Cases] ✅ **ADDRESSED** - spec.md edge cases and data-model.md specify empty JSONLLine for parsing errors
 - [x] CHK066 - Are alignment error handling requirements consistent with data model (no_match, {0, 0} interval)? [Consistency, Data Model §Error Handling, Spec §FR-006] ✅ **ADDRESSED** - spec.md FR-006 and edge cases specify no_match with {0,0} interval
@@ -191,8 +191,8 @@
 ## Summary
 
 **Total Items**: 100
-**Completed**: 95 ✅
-**Partial/Gaps**: 5 ⚠️
+**Completed**: 98 ✅
+**Partial/Gaps**: 2 ⚠️
 **Focus Areas**: Data Models (ExtractionRecord, JSONLLine), Format Requirements (JSONL), Character Intervals, Alignment Status, Data Flow
 **Depth Level**: Formal Release Gate (Comprehensive)
 **Integration Points**: API Response, Schema Flattening, Visualization, Error Handling, Backward Compatibility
@@ -207,16 +207,11 @@
 
 **Items Requiring Attention**:
 
-1. **CHK016** (Partial) - `group_index` default value not explicitly documented (implementation shows default is 0)
-2. **CHK020** (Partial) - `document_id` format requirements not explicitly documented (source and uniqueness documented)
-3. **CHK063** (Partial) - Error metadata fields not explicitly specified (error metadata mentioned but fields not detailed)
-4. **CHK075** (Gap) - Very long extraction text scenarios not documented
-5. **CHK076** (Gap) - Duplicate extraction values scenario not explicitly documented
-6. **CHK077** (Gap) - Nested extraction scenarios not explicitly documented
+1. **CHK075** (Gap) - Very long extraction text scenarios not documented
+2. **CHK076** (Gap) - Duplicate extraction values scenario not explicitly documented
+3. **CHK077** (Gap) - Nested extraction scenarios not explicitly documented
 
 **Next Steps**:
 
-1. Document `group_index` default value (0) in data-model.md
-2. Document `document_id` format requirements in data-model.md
-3. Specify error metadata fields in spec.md FR-007 or data-model.md
-4. Consider documenting edge cases for very long extraction text, duplicate values, and nested extractions (or explicitly mark as out of scope)
+1. Consider documenting edge cases for very long extraction text, duplicate values, and nested extractions (or explicitly mark as out of scope)
+2. ✅ All previously identified partial items (CHK016, CHK020, CHK063) have been addressed in data-model.md
