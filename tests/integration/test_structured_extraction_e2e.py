@@ -19,10 +19,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@patch("ctrlf.app.structured_extract._call_structured_extraction_api")
 class TestStructuredExtractionE2E:
     """Test complete structured extraction workflow (T024)."""
 
+    @patch("ctrlf.app.structured_extract._call_structured_extraction_api")
     def test_ollama_extraction_workflow(
         self,
         mock_api_call: MagicMock,
@@ -69,21 +69,17 @@ class TestStructuredExtractionE2E:
         mock_api_call.assert_called_once()
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test123"})
-    @patch("ctrlf.app.structured_extract.Agent")
+    @patch("ctrlf.app.structured_extract._call_structured_extraction_api")
     def test_openai_extraction_workflow(
         self,
-        mock_agent_class: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test complete workflow with OpenAI provider."""
-        # Mock PydanticAI Agent
-        mock_agent_instance = MagicMock()
-        mock_result = MagicMock()
-        mock_result.output.model_dump.return_value = {
+        # Mock API call directly (bypassing Agent)
+        mock_api_call.return_value = {
             "character": ["Lady Juliet"],
             "emotion": ["longing"],
         }
-        mock_agent_instance.run_sync.return_value = mock_result
-        mock_agent_class.return_value = mock_agent_instance
 
         class CharacterModel(BaseModel):
             character: list[str]
@@ -111,20 +107,16 @@ class TestStructuredExtractionE2E:
         "os.environ",
         {"GOOGLE_API_KEY": "test_google_key_12345678901234567890"},
     )
-    @patch("ctrlf.app.structured_extract.Agent")
+    @patch("ctrlf.app.structured_extract._call_structured_extraction_api")
     def test_gemini_extraction_workflow(
         self,
-        mock_agent_class: MagicMock,
+        mock_api_call: MagicMock,
     ) -> None:
         """Test complete workflow with Gemini provider."""
-        # Mock PydanticAI Agent
-        mock_agent_instance = MagicMock()
-        mock_result = MagicMock()
-        mock_result.output.model_dump.return_value = {
+        # Mock API call directly (bypassing Agent)
+        mock_api_call.return_value = {
             "character": ["Lady Juliet"],
         }
-        mock_agent_instance.run_sync.return_value = mock_result
-        mock_agent_class.return_value = mock_agent_instance
 
         class CharacterModel(BaseModel):
             character: list[str]
@@ -227,12 +219,12 @@ class TestStructuredExtractionE2E:
             lines = f.readlines()
             assert len(lines) == 1
 
+    @patch("langextract.visualize")
     @patch("ctrlf.app.structured_extract._call_structured_extraction_api")
-    @patch("ctrlf.app.structured_extract.langextract")
     def test_visualization_workflow(
         self,
-        mock_langextract: MagicMock,
         mock_api_call: MagicMock,
+        mock_visualize: MagicMock,
         tmp_path: Path,
     ) -> None:
         """Test visualization workflow (T044)."""
@@ -240,10 +232,8 @@ class TestStructuredExtractionE2E:
             "character": ["Lady Juliet"],
         }
 
-        # Mock langextract.visualize()
-        mock_langextract.visualize.return_value = (
-            "<html><body>Visualization</body></html>"
-        )
+        # Mock langextract.visualize() to return HTML string directly
+        mock_visualize.return_value = "<html><body>Visualization</body></html>"
 
         class CharacterModel(BaseModel):
             character: list[str]

@@ -409,6 +409,10 @@ def find_char_interval(
         char_interval: {"start_pos": int, "end_pos": int}
         alignment_status: "match_exact", "match_fuzzy", or "no_match"
     """
+    # Handle empty extraction text
+    if not extraction_text:
+        return ({"start_pos": 0, "end_pos": 0}, "no_match")
+
     # First try exact match
     exact_match = text.find(extraction_text)
     if exact_match != -1:
