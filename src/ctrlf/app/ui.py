@@ -359,7 +359,7 @@ def _check_cancellation(
         Tuple of (ExtractionWorkflowResult, PrePromptInstrumentation) if cancelled,
         None otherwise
     """
-    if progress.cancelled:
+    if progress.cancelled:  # type: ignore[union-attr]
         progress_messages.append("Operation cancelled by user.")
         return (
             ExtractionWorkflowResult(
