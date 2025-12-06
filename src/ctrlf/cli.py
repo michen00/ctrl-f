@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ("cli_entry", "main")
+__all__ = "cli_entry", "main"
 
 import hashlib
 import json
