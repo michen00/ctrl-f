@@ -359,7 +359,7 @@ def _check_cancellation(
         Tuple of (ExtractionWorkflowResult, PrePromptInstrumentation) if cancelled,
         None otherwise
     """
-    if progress.cancelled:  # type: ignore[union-attr]
+    if progress.cancelled:
         progress_messages.append("Operation cancelled by user.")
         return (
             ExtractionWorkflowResult(
@@ -406,7 +406,7 @@ def _create_corpus_progress_callback(
             progress_messages.append(f"Processed {count}/{total} documents")
 
         # Check for cancellation
-        if progress.cancelled:  # type: ignore[union-attr]
+        if progress.cancelled:
             msg = "Operation cancelled by user"
             raise KeyboardInterrupt(msg)
 
@@ -1160,7 +1160,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             ],
         )
 
-    return interface  # type: ignore[no-any-return]
+    return interface
 
 
 def create_review_interface(  # noqa: PLR0915, C901
@@ -1680,4 +1680,4 @@ def create_review_interface(  # noqa: PLR0915, C901
             outputs=[save_status, export_json_output],
         )
 
-    return interface  # type: ignore[no-any-return]
+    return interface

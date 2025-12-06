@@ -30,8 +30,8 @@ dependencies = [
     "yapic-json>=1.9.5",
 ]
 
-# [project.scripts]
-# example-script = "ctrlf.example_script:main"
+[project.scripts]
+ctrl-f = "ctrlf.cli:cli_entry"
 
 [dependency-groups]
 dev = [
