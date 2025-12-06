@@ -85,6 +85,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
+        args: ["--maxkb=1024"]
       - id: check-ast
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -133,9 +134,16 @@ repos:
             "--non-interactive",
           ]
         additional_dependencies:
+          - gradio
+          - json_schema_to_pydantic
+          - langextract
           - nox[uv]
+          - pydantic-ai
           - pydantic[mypy]
           - pytest
-          - types-pyyaml
+          - python-slugify
+          - structlog
+          - thefuzz
           - typer
+          - types-pyyaml
         stages: ["pre-push"]
