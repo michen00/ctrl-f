@@ -2,3 +2,4 @@
 c9d101ba3d41152abaaef58a157a88e57f758c64  # style: update revision format for check-jsonschema in pre-commit config
 d6fe831a8da3cb8b58f9954ca8952a7b462fe629  # style: remove whitespace
 a1cdf26a5b722b2fed87d66827036455d571054c  # style: adjust line breaks
+e4a12aeca021b698445234546404d8c7e489d308  # style: update conventions
