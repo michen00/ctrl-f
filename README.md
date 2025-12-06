@@ -99,7 +99,7 @@ The application will start on `http://localhost:7860`.
 **Ollama Setup (Default Provider)**:
 
 - The default provider is Ollama (local, no API key needed)
-- If Ollama is not installed, install it from https://ollama.ai
+- If Ollama is not installed, install it from <https://ollama.ai>
 - If the default model (`llama3`) is not available, run: `make provision-ollama`
 - Or use OpenAI/Gemini providers by setting API keys in `.env` (see `.env.example`)
 
