@@ -49,6 +49,7 @@ __all__ = (
     "FlattenedExtraction",
     "_call_structured_extraction_api",
     "_extraction_record_to_candidate",
+    "check_ollama_setup",
     "find_char_interval",
     "run_structured_extraction",
     "visualize_extractions",
@@ -172,11 +173,73 @@ def estimate_cost(
     }
 
 
+# not sure why we're doing this in Python
+def check_ollama_setup(model: str | None = None) -> None:
+    """Check if Ollama is running and the specified model is available.
+
+    Args:
+        model: Model name to check (defaults to "llama3" if not specified)
+
+    Raises:
+        RuntimeError: If Ollama is not running or model is not available
+    """
+    import shutil  # noqa: PLC0415  # nosec import_subprocess
+    import subprocess  # noqa: PLC0415  # nosec import_subprocess
+
+    model_name = model or "llama3"
+
+    # Find ollama executable
+    ollama_path = shutil.which("ollama")
+    if not ollama_path:
+        msg = (
+            "Ollama is not installed. "
+            "Please install Ollama from https://ollama.ai. "
+            f"After installation, start Ollama and pull the model with: "
+            f"ollama pull {model_name}"
+        )
+        raise RuntimeError(msg)
+
+    # Check if Ollama is running
+    # Note: ollama_path is from shutil.which() which validates the executable exists
+    # We're only calling "ollama list" which is safe
+    try:
+        result = subprocess.run(  # noqa: S603
+            [ollama_path, "list"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            msg = (
+                f"Ollama is not running or not installed. "
+                f"Please start Ollama or install it from https://ollama.ai. "
+                f"Error: {result.stderr}"
+            )
+            raise RuntimeError(msg)
+    except subprocess.TimeoutExpired:
+        msg = (
+            "Ollama is not responding. "
+            "Please ensure Ollama is running. "
+            "Start it with: ollama serve"
+        )
+        raise RuntimeError(msg) from None
+
+    # Check if the model is available
+    if model_name not in result.stdout:
+        msg = (
+            f"Ollama model '{model_name}' is not available. "
+            f"Available models: {result.stdout.strip() or '(none)'}. "
+            f"Pull the model with: ollama pull {model_name}"
+        )
+        raise RuntimeError(msg)
+
+
 def validate_api_key(provider: str) -> None:
     """Validate API key for the given provider.
 
     Checks for required API keys based on provider:
-    - Ollama: No API key required (local only)
+    - Ollama: No API key required (local only), but checks if Ollama is running
     - OpenAI: Requires OPENAI_API_KEY environment variable
     - Gemini: Requires GOOGLE_API_KEY environment variable
 
@@ -185,11 +248,13 @@ def validate_api_key(provider: str) -> None:
 
     Raises:
         ValueError: If provider is invalid or API key is missing/invalid
+        RuntimeError: If Ollama is not running or model is not available
     """
     import os  # noqa: PLC0415
 
     if provider == "ollama":
-        # Ollama doesn't need API keys (local only)
+        # Ollama doesn't need API keys (local only), but check if it's running
+        # We'll check for the default model when extraction is called
         return
 
     if provider == "openai":
@@ -531,6 +596,10 @@ def _call_structured_extraction_api(  # noqa: PLR0915
     # Validate API key before proceeding
     validate_api_key(provider)
 
+    # For Ollama, check if it's running and model is available
+    if provider == "ollama":
+        check_ollama_setup(model)
+
     # Validate schema before API call
     try:
         schema_dict = schema_model.model_json_schema()
@@ -720,7 +789,27 @@ def _call_structured_extraction_api(  # noqa: PLR0915
         logger.exception(
             "Structured extraction failed with %s after retries", model_str, exc_info=e
         )
-        msg = f"Extraction failed: {e}"
+        # Provide helpful error messages for common issues
+        error_str = str(e).lower()
+        if provider == "ollama":
+            if "404" in error_str or "not found" in error_str or "model" in error_str:
+                model_name = model or "llama3"
+                msg = (
+                    f"Ollama model '{model_name}' is not available. "
+                    f"Error: {e}. "
+                    f"Pull the model with: ollama pull {model_name} "
+                    f"Or check available models with: ollama list"
+                )
+            elif "connection" in error_str or "refused" in error_str:
+                msg = (
+                    f"Ollama is not running. "
+                    f"Error: {e}. "
+                    f"Start Ollama with: ollama serve"
+                )
+            else:
+                msg = f"Extraction failed: {e}"
+        else:
+            msg = f"Extraction failed: {e}"
         raise RuntimeError(msg) from e
 
 

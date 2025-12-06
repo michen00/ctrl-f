@@ -61,8 +61,38 @@ help: ## Show this help message
 	@echo "  $(YELLOW)VERBOSE$(_COLOR) = true|false  Set to true to enable verbose output (default: false)"
 
 .PHONY: demo
-demo: install ## Run the demo server
+demo: install check-ollama ## Run the demo server
 	$(UV) run python -m ctrlf.app.server
+
+.PHONY: check-ollama
+check-ollama: ## Check if Ollama is running and default model is available (non-blocking)
+	@echo "$(BOLD)$(CYAN)Checking Ollama setup...$(_COLOR)"
+	@if command -v ollama >/dev/null 2>&1; then \
+		if ollama list 2>/dev/null | grep -q "llama3"; then \
+			echo "$(GREEN)✓ Ollama is running and llama3 model is available$(_COLOR)"; \
+		else \
+			echo "$(YELLOW)⚠ Ollama is running but llama3 model is not available$(_COLOR)"; \
+			echo "$(YELLOW)  Run 'make provision-ollama' to pull the default model$(_COLOR)"; \
+			echo "$(YELLOW)  Note: Server will start anyway. You can use OpenAI/Gemini providers.$(_COLOR)"; \
+		fi; \
+	else \
+		echo "$(YELLOW)⚠ Ollama is not installed (optional - default provider)$(_COLOR)"; \
+		echo "$(YELLOW)  Install from: https://ollama.ai or use OpenAI/Gemini providers instead$(_COLOR)"; \
+		echo "$(YELLOW)  For OpenAI/Gemini: Set API keys in .env (see .env.example)$(_COLOR)"; \
+		echo "$(YELLOW)  Server will start anyway.$(_COLOR)"; \
+	fi
+
+.PHONY: provision-ollama
+provision-ollama: ## Pull the default Ollama model (llama3)
+	@echo "$(BOLD)$(CYAN)Provisioning Ollama model...$(_COLOR)"
+	@if command -v ollama >/dev/null 2>&1; then \
+		echo "$(YELLOW)Pulling llama3 model (this may take a while)...$(_COLOR)"; \
+		ollama pull llama3 && echo "$(GREEN)✓ llama3 model pulled successfully$(_COLOR)"; \
+	else \
+		echo "$(RED)✗ Ollama is not installed$(_COLOR)"; \
+		echo "$(YELLOW)  Install from: https://ollama.ai$(_COLOR)"; \
+		exit 1; \
+	fi
 
 .PHONY: install
 install: build/install-python-versions ## Install the project
