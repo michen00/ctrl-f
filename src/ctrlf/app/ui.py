@@ -406,7 +406,7 @@ def _create_corpus_progress_callback(
             progress_messages.append(f"Processed {count}/{total} documents")
 
         # Check for cancellation
-        if progress.cancelled:
+        if progress.cancelled:  # type: ignore[union-attr]
             msg = "Operation cancelled by user"
             raise KeyboardInterrupt(msg)
 
@@ -1160,7 +1160,7 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
             ],
         )
 
-    return interface
+    return interface  # type: ignore[no-any-return]
 
 
 def create_review_interface(  # noqa: PLR0915, C901
@@ -1680,4 +1680,4 @@ def create_review_interface(  # noqa: PLR0915, C901
             outputs=[save_status, export_json_output],
         )
 
-    return interface
+    return interface  # type: ignore[no-any-return]
