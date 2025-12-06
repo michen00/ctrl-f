@@ -564,7 +564,7 @@ def find_char_interval(
     return ({"start_pos": 0, "end_pos": 0}, "no_match")
 
 
-def _call_structured_extraction_api(  # noqa: PLR0915
+def _call_structured_extraction_api(  # noqa: C901 PLR0915
     text: str,
     schema_model: type[BaseModel],
     provider: str = "ollama",
@@ -599,6 +599,14 @@ def _call_structured_extraction_api(  # noqa: PLR0915
     # For Ollama, check if it's running and model is available
     if provider == "ollama":
         check_ollama_setup(model)
+        # Set OLLAMA_BASE_URL environment variable if not already set
+        # PydanticAI requires this to be set for Ollama provider
+        # The base URL must include /v1 suffix for the OpenAI-compatible API endpoint
+        import os  # noqa: PLC0415
+
+        if "OLLAMA_BASE_URL" not in os.environ:
+            os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434/v1"
+            logger.debug("Set OLLAMA_BASE_URL=http://localhost:11434/v1")
 
     # Validate schema before API call
     try:
