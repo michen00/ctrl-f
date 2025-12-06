@@ -327,7 +327,7 @@ def run_extraction(
         corpus_docs: List of corpus documents
         provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
         model_name: Model name (optional, uses provider default)
-            For Ollama: defaults to "llama3"
+            For Ollama: defaults to "llama3.1" (supports tools/function calling)
             For OpenAI: defaults to "gpt-4o"
             For Gemini: defaults to "gemini-2.5-flash"
         fuzzy_threshold: Minimum similarity score for fuzzy matching (0-100,

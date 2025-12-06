@@ -840,10 +840,10 @@ def create_upload_interface() -> gr.Blocks:  # noqa: C901, PLR0915
                 label="Model Name (Optional)",
                 placeholder=(
                     "Leave empty to use provider default "
-                    "(e.g., llama3, gpt-4o, gemini-2.5-flash)"
+                    "(e.g., llama3.1, gpt-4o, gemini-2.5-flash)"
                 ),
                 info=(
-                    "Provider defaults: Ollama=llama3, "
+                    "Provider defaults: Ollama=llama3.1 (supports tools), "
                     "OpenAI=gpt-4o, Gemini=gemini-2.5-flash"
                 ),
             )

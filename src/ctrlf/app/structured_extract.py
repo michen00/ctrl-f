@@ -30,7 +30,7 @@ Example usage:
         schema=schema,
         corpus_docs=corpus_docs,
         provider="ollama",
-        model="llama3",
+        model="llama3.1",
     )
 
     # Write JSONL file
@@ -141,7 +141,7 @@ def estimate_cost(
             "output_cost": 0.0,
             "total_cost": 0.0,
             "provider": provider,
-            "model": model or "llama3",
+            "model": model or "llama3.1",
             "note": "Ollama is free (local only, no API costs)",
         }
 
@@ -178,7 +178,7 @@ def check_ollama_setup(model: str | None = None) -> None:
     """Check if Ollama is running and the specified model is available.
 
     Args:
-        model: Model name to check (defaults to "llama3" if not specified)
+        model: Model name to check (defaults to "llama3.1" if not specified)
 
     Raises:
         RuntimeError: If Ollama is not running or model is not available
@@ -186,7 +186,7 @@ def check_ollama_setup(model: str | None = None) -> None:
     import shutil  # noqa: PLC0415  # nosec import_subprocess
     import subprocess  # noqa: PLC0415  # nosec import_subprocess
 
-    model_name = model or "llama3"
+    model_name = model or "llama3.1"
 
     # Find ollama executable
     ollama_path = shutil.which("ollama")
@@ -581,8 +581,9 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
         text: Document text to extract from
         schema_model: Pydantic model (Extended Schema) defining the output structure
         provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
-        model: Model name (e.g., "llama3", "gpt-4o", "gemini-2.5-flash")
-            For Ollama, defaults to "llama3" if not specified
+        model: Model name (e.g., "llama3.1", "gpt-4o", "gemini-2.5-flash")
+            For Ollama, defaults to "llama3.1" if not specified
+            (supports tools/function calling)
             For Gemini, defaults to "gemini-2.5-flash" if not specified
 
     Returns:
@@ -637,7 +638,7 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
     # identifiers. Note: google-gla is the correct provider identifier (not
     # google-genai). See: https://ai.pydantic.dev/api/models/google/
     if provider == "ollama":
-        model_str = f"ollama:{model or 'llama3'}"
+        model_str = f"ollama:{model or 'llama3.1'}"
     elif provider == "openai":
         model_str = f"openai:{model or 'gpt-4o'}"
     elif provider == "gemini":
@@ -659,7 +660,7 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
 
         # Token limits by provider/model (approximate)
         token_limits: dict[str, dict[str, int]] = {
-            "ollama": {"llama3": 128000, "default": 128000},
+            "ollama": {"llama3.1": 128000, "llama3": 128000, "default": 128000},
             "openai": {
                 "gpt-4o": 128000,
                 "gpt-4-turbo": 128000,
@@ -677,7 +678,7 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
         # Check token limits
         provider_limits = token_limits.get(provider, {})
         model_name = model or (
-            "llama3"
+            "llama3.1"
             if provider == "ollama"
             else ("gpt-4o" if provider == "openai" else "gemini-2.5-flash")
         )
@@ -801,7 +802,7 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
         error_str = str(e).lower()
         if provider == "ollama":
             if "404" in error_str or "not found" in error_str or "model" in error_str:
-                model_name = model or "llama3"
+                model_name = model or "llama3.1"
                 msg = (
                     f"Ollama model '{model_name}' is not available. "
                     f"Error: {e}. "
@@ -973,7 +974,7 @@ def run_structured_extraction(
         corpus_docs: List of corpus documents
         provider: API provider ("ollama", "openai", or "gemini", default: "ollama")
         model: Model name (optional, uses provider default)
-            For Ollama: defaults to "llama3"
+            For Ollama: defaults to "llama3.1" (supports tools/function calling)
             For OpenAI: defaults to "gpt-4o"
             For Gemini: defaults to "gemini-2.5-flash"
         fuzzy_threshold: Minimum similarity score for fuzzy matching (0-100)
