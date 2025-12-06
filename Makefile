@@ -2,6 +2,7 @@ VERSION ?= $(shell grep -E '^version[[:space:]]*=' pyproject.toml | sed 's/.*=[[
 VENV = .venv
 
 .ONESHELL:
+.WAIT:
 
 DEBUG    ?= false
 VERBOSE  ?= false
@@ -103,9 +104,6 @@ WITH_HOOKS ?= true
 develop: build/install-dev ## Install the project for development (WITH_HOOKS={true|false}, default=true)
 	@echo "Installing missing type stubs..." && \
         $(UV) run mypy --install-types --non-interactive --follow-imports=silent > /dev/null 2>&1 || true
-	@if [ "$(WITH_HOOKS)" = "true" ]; then \
-        $(MAKE) enable-git-hooks; \
-    fi
 	@git config --local --add include.path "$(CURDIR)/.gitconfigs/alias"
 	@git config blame.ignoreRevsFile .git-blame-ignore-revs
 	@git lfs install --local; \
@@ -116,63 +114,23 @@ develop: build/install-dev ## Install the project for development (WITH_HOOKS={t
        else \
            stash_was_needed=0; \
        fi; \
-       git checkout main && git pull && \
-       git lfs pull && git checkout $$current_branch; \
+       git switch main && git pull && \
+       git lfs pull && git switch $$current_branch; \
        if [ $$stash_was_needed -eq 1 ]; then \
            git stash pop; \
        fi
+	@if [ "$(WITH_HOOKS)" = "true" ]; then \
+        $(MAKE) enable-pre-commit; \
+    fi
 
 .PHONY: test
-PARALLEL ?= true
-test: build/install-test ## Run all tests with coverage (PARALLEL={true|false}, default=true)
+PARALLEL ?= false
+test: build/install-test ## Run all tests with coverage (PARALLEL={true|false}, default=false)
 	@PYTEST_CMD="$(PYTEST)"; [ "$(PARALLEL)" = "true" ] && PYTEST_CMD="$$PYTEST_CMD -n auto"; \
     $(UV) run $$PYTEST_CMD --cov=src --cov-report=term-missing
 
 .PHONY: check
 check: format-all test ## Run all code quality checks and tests
-
-###############
-## Git hooks ##
-###############
-
-.PHONY: enable-git-hooks
-enable-git-hooks: configure-git-hooks ## Enable Git hooks
-	@set -e; \
-    mv .gitconfigs/hooks .gitconfigs/hooks.bak && \
-    trap 'mv .gitconfigs/hooks.bak .gitconfigs/hooks' EXIT; \
-    $(UV) run pre-commit install && \
-    mv .git/hooks/pre-commit .githooks/pre-commit && \
-    echo "pre-commit hooks moved to .githooks/pre-commit"
-
-.PHONY: enable-pre-commit-only
-enable-pre-commit-only: ## Enable pre-commit hooks without enabling commit hooks
-	@git config --local --unset-all include.path > /dev/null 2>&1 || true
-	@rm -f .githooks/pre-commit && $(UV) run pre-commit install
-
-.PHONY: enable-commit-hooks-only
-enable-commit-hooks-only: configure-git-hooks ## Enable commit hooks without enabling pre-commit hooks
-	@rm -f .githooks/pre-commit
-	@echo "Enabled commit hooks only"
-
-.PHONY: configure-git-hooks
-configure-git-hooks: ## Configure Git to use the hooksPath defined in .gitconfig
-	@git config --local --add include.path "$(CURDIR)/.gitconfigs/hooks" && \
-        echo "Configured Git to use hooksPath defined in .gitconfigs/hooks"
-
-.PHONY: disable-commit-hooks-only
-disable-commit-hooks-only: disable-git-hooks enable-commit-hooks-only ## Disable commit hooks and enable pre-commit hooks
-	@echo "Disabled commit hooks and enabled pre-commit hooks"
-
-.PHONY: disable-pre-commit-only
-disable-pre-commit-only: disable-git-hooks enable-pre-commit-only ## Disable pre-commit hooks and enable commit hooks
-	@echo "Disabled pre-commit hooks and enabled commit hooks"
-
-.PHONY: disable-git-hooks
-disable-git-hooks: ## Disable the use of Git hooks locally
-	@git config --local --unset-all include.path > /dev/null 2>&1 || true
-	@git config --local --unset-all core.hooksPath > /dev/null 2>&1 || true
-	@rm -f .git/hooks/pre-commit
-	@echo "Disabled Git hooks"
 
 ################################
 ## (post-|un|re)?installation ##
@@ -195,8 +153,9 @@ TO_REMOVE := \
     */.venv \
     .coverage \
     .eggs \
+    .git/hooks/commit-msg \
     .git/hooks/pre-commit \
-    .githooks/pre-commit \
+    .git/hooks/pre-push \
     .ipynb_checkpoints \
     .mypy_cache \
     .pytest_cache \
@@ -218,10 +177,10 @@ clean: ## Remove build artifacts, caches, and temporary files
 clean-uninstall: clean uninstall ## Clean up project artifacts and uninstall the package
 
 .PHONY: clean-reinstall
-clean-reinstall: clean-uninstall install ## Clean up project artifacts and reinstall the package
+clean-reinstall: clean-uninstall .WAIT install ## Clean up project artifacts and reinstall the package
 
 .PHONY: clean-reinstall-dev
-clean-reinstall-dev: clean-uninstall develop ## Clean up project artifacts and reinstall the package for development (WITH_HOOKS={true|false}, default=true)
+clean-reinstall-dev: clean-uninstall .WAIT develop ## Clean up project artifacts and reinstall the package for development (WITH_HOOKS={true|false}, default=true)
 
 ##################
 ## code quality ##
@@ -248,24 +207,22 @@ lint-unsafe: build/install-dev ## Lint the code with Ruff, fixing issues where p
 	@$(MAKE) .display-lint-complete
 
 .PHONY: format
-format: lint ruff-format ## Format the code with Ruff
+format: lint .WAIT ruff-format ## Format the code with Ruff
 
 .PHONY: format-unsafe
-format-unsafe: lint-unsafe ruff-format ## Format the code with Ruff using --unsafe-fixes
+format-unsafe: lint-unsafe .WAIT ruff-format ## Format the code with Ruff using --unsafe-fixes
 
 .PHONY: run-pre-commit
 run-pre-commit: build/install-dev ## Run the pre-commit checks
-	@if [ -s .githooks/pre-commit ] || [ -s .git/hooks/pre-commit ]; then \
-        :; \
-    else \
-        echo "Pre-commit hooks missing. Installing pre-commit hooks..."; \
-        $(MAKE) enable-pre-commit-only; \
-    fi
 	$(UV) run $(PRECOMMIT) run --all-files
 
 .PHONY: .display-lint-complete
 .display-lint-complete: ## Display a message when linting is complete
 	@echo "$(BOLD)$(YELLOW)Linting complete!$(_COLOR)"
+
+.PHONY: enable-pre-commit
+enable-pre-commit: ## Enable pre-commit hooks (along with commit-msg and pre-push hooks)
+	@$(UV) run pre-commit install --hook-type commit-msg --hook-type pre-commit --hook-type pre-push
 
 ###########################
 ## development shortcuts ##
@@ -326,6 +283,6 @@ build/install-deps: build/install-python-versions
 	$(UV) sync --no-editable --no-install-project
 	mkdir -p $(dir $@) && touch $@
 
-.PHONY: check-install-uv build/install-python-versions
-build/install-python-versions:
+.PHONY: build/install-python-versions
+build/install-python-versions: check-install-uv
 	$(UV) python install $(shell cat .python-version)
