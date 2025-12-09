@@ -768,11 +768,47 @@ def _call_structured_extraction_api(  # noqa: C901 PLR0915
             # Convert Pydantic model instance to dict
             extracted_data = result.output.model_dump()
 
+            # Log raw model output for diagnostics
             logger.debug(
-                "Extracted data for document using %s: %s fields extracted",
+                "Raw model output: %s",
+                json.dumps(extracted_data, indent=2, default=str),
+            )
+
+            # Log schema structure
+            schema_dict = schema_model.model_json_schema()
+            schema_properties = schema_dict.get("properties", {})
+            logger.debug(
+                "Schema structure: %d fields, keys: %s",
+                len(schema_properties),
+                list(schema_properties.keys()),
+            )
+
+            # Log field counts and types to verify model understood the schema
+            non_empty_fields = {
+                k: type(v).__name__ for k, v in extracted_data.items() if v is not None
+            }
+            empty_fields = {
+                k for k, v in extracted_data.items() if v is None or v == []
+            }
+
+            logger.debug(
+                "Extracted data for document using %s: %d fields extracted, "
+                "%d non-empty (%s), %d empty/None",
                 model_str,
                 len(extracted_data),
+                len(non_empty_fields),
+                non_empty_fields,
+                len(empty_fields),
             )
+
+            # Warn if all values are None or empty
+            if not non_empty_fields and extracted_data:
+                logger.warning(
+                    "Model returned data but all fields are None or empty! Data: %s",
+                    json.dumps(extracted_data, indent=2, default=str),
+                )
+            elif not extracted_data:
+                logger.warning("Model returned empty dict!")
         except Exception:
             # Calculate response time even on error
             response_time = time.time() - start_time
@@ -898,7 +934,37 @@ def _extraction_record_to_candidate(
     )
 
 
-def _flatten_extractions(
+def _is_extended_schema(schema: dict[str, Any]) -> bool:
+    """Check if schema is an Extended Schema (all fields are arrays).
+
+    Extended Schema means all fields are defined as arrays (list[type]),
+    which is the expected format for structured extraction.
+
+    Args:
+        schema: JSON Schema definition
+
+    Returns:
+        True if schema appears to be Extended Schema (all fields are arrays),
+        False otherwise
+    """
+    if "properties" not in schema:
+        return False
+
+    properties = schema["properties"]
+    if not properties:
+        return False
+
+    # Check if all fields are arrays
+    for field_schema in properties.values():
+        field_type = field_schema.get("type")
+        # Extended Schema should have all fields as arrays
+        if field_type != "array":
+            return False
+
+    return True
+
+
+def _flatten_extractions(  # noqa: PLR0912 PLR0915 C901
     data: dict[str, Any],
     schema: dict[str, Any],
     prefix: str = "",
@@ -918,44 +984,147 @@ def _flatten_extractions(
     extractions: list[FlattenedExtraction] = []
 
     if "properties" not in schema:
+        logger.debug(
+            "Schema has no 'properties' key, returning empty extractions. "
+            "Schema keys: %s",
+            list(schema.keys()),
+        )
         return extractions
 
-    for field_name, field_schema in schema["properties"].items():
+    schema_properties = schema["properties"]
+    logger.debug(
+        "Flattening %d fields from schema (prefix: '%s'), data keys: %s",
+        len(schema_properties),
+        prefix or "(root)",
+        list(data.keys()),
+    )
+
+    fields_processed = 0
+    fields_skipped_none = 0
+    fields_skipped_empty_array = 0
+    fields_with_extractions = 0
+
+    for field_name, field_schema in schema_properties.items():
         full_field_name = f"{prefix}.{field_name}" if prefix else field_name
         field_value = data.get(field_name)
 
         if field_value is None:
+            logger.debug("Skipping field '%s': value is None", full_field_name)
+            fields_skipped_none += 1
             continue
 
         field_type = field_schema.get("type")
+        fields_processed += 1
+
+        # Log field processing for diagnostics
+        logger.debug(
+            "Processing field '%s' (type: %s, value type: %s)",
+            full_field_name,
+            field_type,
+            type(field_value).__name__,
+        )
 
         if field_type == "array":
             # Handle array of values
             items_schema = field_schema.get("items", {})
             if isinstance(field_value, list):
-                for idx, item in enumerate(field_value):
-                    if isinstance(item, str):
-                        extractions.append(
-                            FlattenedExtraction(full_field_name, item, {"index": idx})
-                        )
-                    elif isinstance(item, dict):
-                        # Nested object in array
-                        nested = _flatten_extractions(
-                            item, items_schema, f"{full_field_name}[{idx}]"
-                        )
-                        extractions.extend(nested)
+                if not field_value:
+                    logger.debug("Skipping field '%s': empty array", full_field_name)
+                    fields_skipped_empty_array += 1
+                else:
+                    logger.debug(
+                        "Processing array field '%s': %d items",
+                        full_field_name,
+                        len(field_value),
+                    )
+                    # Track extractions added by this field (before processing)
+                    extractions_before = len(extractions)
+                    for idx, item in enumerate(field_value):
+                        if isinstance(item, str):
+                            extractions.append(
+                                FlattenedExtraction(
+                                    full_field_name, item, {"index": idx}
+                                )
+                            )
+                        elif isinstance(item, dict):
+                            # Nested object in array
+                            # If items_schema has properties, use it; otherwise
+                            # flatten the dict directly (for generic dict[str, object])
+                            if "properties" in items_schema:
+                                nested = _flatten_extractions(
+                                    item, items_schema, f"{full_field_name}[{idx}]"
+                                )
+                            else:
+                                # Generic dict: flatten keys directly with dot notation
+                                nested = []
+                                for key, value in item.items():
+                                    nested_field_name = (
+                                        f"{full_field_name}[{idx}].{key}"
+                                    )
+                                    if isinstance(value, str):
+                                        nested.append(
+                                            FlattenedExtraction(
+                                                nested_field_name, value, {"index": idx}
+                                            )
+                                        )
+                                    elif value is not None:
+                                        nested.append(
+                                            FlattenedExtraction(
+                                                nested_field_name,
+                                                str(value),
+                                                {"index": idx},
+                                            )
+                                        )
+                            extractions.extend(nested)
+                    # Only count if this field added extractions (check length change)
+                    if len(extractions) > extractions_before:
+                        fields_with_extractions += 1
+            else:
+                logger.debug(
+                    "Field '%s' is schema type 'array' but value is %s, skipping",
+                    full_field_name,
+                    type(field_value).__name__,
+                )
         elif field_type == "object":
             # Handle nested object
+            logger.debug("Processing nested object field '%s'", full_field_name)
             nested = _flatten_extractions(field_value, field_schema, full_field_name)
             extractions.extend(nested)
+            if nested:
+                fields_with_extractions += 1
         elif isinstance(field_value, str):
             # Primitive string value
+            logger.debug(
+                "Adding string extraction for field '%s': '%s'",
+                full_field_name,
+                field_value[:50] + "..." if len(field_value) > 50 else field_value,
+            )
             extractions.append(FlattenedExtraction(full_field_name, field_value, None))
+            fields_with_extractions += 1
         elif field_value is not None:
             # Convert non-string primitives to string
+            logger.debug(
+                "Converting non-string value for field '%s' (type: %s) to string",
+                full_field_name,
+                type(field_value).__name__,
+            )
             extractions.append(
                 FlattenedExtraction(full_field_name, str(field_value), None)
             )
+            fields_with_extractions += 1
+
+    # Log flattening summary
+    logger.debug(
+        "Flattening summary (prefix: '%s'): %d fields processed, "
+        "%d with extractions, %d skipped (None), %d skipped (empty array), "
+        "%d total extractions",
+        prefix or "(root)",
+        fields_processed,
+        fields_with_extractions,
+        fields_skipped_none,
+        fields_skipped_empty_array,
+        len(extractions),
+    )
 
     return extractions
 
@@ -992,6 +1161,28 @@ def run_structured_extraction(
     # Get JSON Schema dict for flattening
     schema_dict = schema.model_json_schema()
 
+    # Verify schema type (Extended vs Non-Extended)
+    is_extended = _is_extended_schema(schema_dict)
+    schema_properties = schema_dict.get("properties", {})
+    logger.debug(
+        "Schema type check: Extended Schema=%s, %d fields",
+        is_extended,
+        len(schema_properties),
+    )
+
+    if not is_extended:
+        logger.warning(
+            "Schema does not appear to be Extended Schema "
+            "(all fields should be arrays). "
+            "This may cause extraction issues. Schema properties: %s",
+            list(schema_properties.keys()),
+        )
+        # Log field types for debugging
+        field_types = {
+            k: v.get("type", "unknown") for k, v in schema_properties.items()
+        }
+        logger.debug("Schema field types: %s", field_types)
+
     jsonl_lines: list[JSONLLine] = []
 
     for doc in corpus_docs:
@@ -1001,8 +1192,52 @@ def run_structured_extraction(
                 doc.markdown, schema, provider=provider, model=model
             )
 
+            # Log input to flattening for diagnostics
+            logger.debug(
+                "Input to flattening for document %s: %d fields, keys: %s",
+                doc.doc_id,
+                len(extracted_data),
+                list(extracted_data.keys()),
+            )
+
             # Flatten extractions
             flat_extractions = _flatten_extractions(extracted_data, schema_dict)
+
+            # Log flattening results and validate
+            schema_properties_count = len(schema_dict.get("properties", {}))
+            logger.info(
+                "Flattened %d extractions from %d schema fields for document %s",
+                len(flat_extractions),
+                schema_properties_count,
+                doc.doc_id,
+            )
+
+            # Validate that flattening produced results when model returned data
+            if not flat_extractions and extracted_data:
+                # Check if all values are None or empty arrays
+                non_empty_values = {
+                    k: v for k, v in extracted_data.items() if v is not None and v != []
+                }
+                if non_empty_values:
+                    logger.warning(
+                        "Model returned data but flattening produced no extractions! "
+                        "Document: %s, Non-empty fields: %s, "
+                        "Full data: %s",
+                        doc.doc_id,
+                        list(non_empty_values.keys()),
+                        json.dumps(extracted_data, indent=2, default=str),
+                    )
+                else:
+                    logger.debug(
+                        "No extractions: all model values are None or empty arrays "
+                        "for document %s",
+                        doc.doc_id,
+                    )
+            elif not flat_extractions:
+                logger.debug(
+                    "No extractions: model returned empty data for document %s",
+                    doc.doc_id,
+                )
 
             # Find character intervals and create ExtractionRecord objects
             extraction_records: list[ExtractionRecord] = []
@@ -1031,9 +1266,29 @@ def run_structured_extraction(
             )
             jsonl_lines.append(jsonl_line)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
+            # Include extracted_data in exception context if available
+            # (extracted_data may not be defined if error occurred before extraction)
+            # Note: We only check if it exists in locals(), not its truthiness,
+            # because an empty dict {} is a valid extraction result (falsy but complete)
+            extracted_data_context = (
+                json.dumps(extracted_data, indent=2, default=str)
+                if "extracted_data" in locals()
+                else "N/A (extraction did not complete)"
+            )
+
             logger.warning(
-                "Structured extraction failed for document %s: %s", doc.doc_id, e
+                "Structured extraction failed for document %s: %s. "
+                "Schema: %d fields (%s), "
+                "Extracted data (if available): %s",
+                doc.doc_id,
+                e,
+                len(schema_dict.get("properties", {})),
+                list(schema_dict.get("properties", {}).keys()),
+                extracted_data_context,
+            )
+            logger.exception(
+                "Full exception traceback for document %s", doc.doc_id, exc_info=e
             )
             # Create empty extraction record for failed documents
             jsonl_line = JSONLLine(
