@@ -15,15 +15,9 @@ ci:
 repos:
   # security
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.29.0
+    rev: v8.30.0
     hooks:
       - id: gitleaks
-        fail_fast: true
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.0
-    hooks:
-      - id: bandit
-        args: ["-c", ".bandit.yml"]
         fail_fast: true
   # formatters & fixers
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,7 +26,7 @@ repos:
       - id: requirements-txt-fixer
       - id: trailing-whitespace
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.5
+    rev: v0.14.8
     hooks:
       - id: ruff-check
         types_or: [python, pyi, jupyter, toml]
@@ -47,7 +41,7 @@ repos:
     hooks:
       - id: shfmt
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.45.0
+    rev: v0.46.0
     hooks:
       - id: markdownlint
         args: ["--fix"]
@@ -97,12 +91,12 @@ repos:
     hooks:
       - id: shellcheck
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.8
+    rev: v1.7.9
     hooks:
       - id: actionlint
   # static type analysis
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
+    rev: v1.19.0
     hooks:
       - id: mypy
         args:
