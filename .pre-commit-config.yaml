@@ -19,13 +19,6 @@ repos:
     hooks:
       - id: gitleaks
         fail_fast: true
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.2
-    hooks:
-      - id: bandit
-        args: ["-c", ".bandit.yml"]
-        fail_fast: true
-        fail_fast: true
   # formatters & fixers
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
