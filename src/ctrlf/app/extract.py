@@ -189,7 +189,7 @@ Example text:
         contents=prompt,
     )
 
-    completion_text = response.text if response.text else ""
+    completion_text = response.text or ""
 
     # Extract metadata from response
     prompt_tokens, completion_tokens, finish_reason, response_metadata = (
