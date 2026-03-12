@@ -233,7 +233,7 @@ The application follows a clear data flow:
 
 - **Confidence threshold**: 0.75 (minimum confidence for consensus, adjustable in UI)
 - **Margin threshold**: 0.20 (minimum margin over next candidate, fixed)
-- Consensus candidates are automatically pre-selected in the UI
+- Consensus candidates are automatically preselected in the UI
 - Disagreements (similar confidence scores) are flagged for manual review
 
 ### Storage
