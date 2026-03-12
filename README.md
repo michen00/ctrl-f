@@ -187,7 +187,7 @@ The review interface provides comprehensive tools for reviewing and resolving ex
 2. **Review Candidates**: For each field, you'll see:
 
    - **Consensus Status**:
-     - ✅ Consensus detected (with confidence percentage) - value is pre-selected
+     - ✅ Consensus detected (with confidence percentage) - value is preselected
      - 🔴 Disagreement detected - multiple candidates with similar confidence, manual selection required
      - ⚠️ No consensus - manual selection required
    - **Candidate List**: All candidate values with confidence scores displayed as percentages

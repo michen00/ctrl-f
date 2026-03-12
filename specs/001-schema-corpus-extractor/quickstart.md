@@ -103,7 +103,7 @@ Or create a zip/tar archive of documents.
 1. **Review Candidates**: For each field, you'll see:
 
    - List of candidate values with confidence scores
-   - Consensus candidate (if detected) - pre-selected
+   - Consensus candidate (if detected) - preselected
    - "View source" button next to each candidate
    - "Other" option for custom input
 
