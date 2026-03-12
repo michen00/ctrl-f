@@ -61,7 +61,7 @@ A user encounters situations where multiple documents contain conflicting values
 
 1. **Given** extraction found 3 different values for a date field from 3 different documents, **When** the user views the review interface, **Then** all 3 candidates are shown with their confidence scores and source indicators
 2. **Given** a user is comparing two conflicting candidates, **When** they click "View source" for each, **Then** the system displays side-by-side context snippets showing where each value was found
-3. **Given** the system detected low consensus (multiple similar-confidence candidates), **When** the user reviews the field, **Then** the field is visually flagged as needing resolution and no value is pre-selected
+3. **Given** the system detected low consensus (multiple similar-confidence candidates), **When** the user reviews the field, **Then** the field is visually flagged as needing resolution and no value is preselected
 
 ---
 
