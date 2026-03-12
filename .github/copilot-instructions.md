@@ -159,10 +159,8 @@ ctrlf/
 ## 4) Conventional Commits and contribution workflow
 
 - Commit message format: `<type>(<scope>): <subject>`
-
   - Common types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
   - Useful scopes for this repo:
-
     - `app` - Application code changes
     - `ui` - User interface changes
     - `extract` - Extraction logic
@@ -178,7 +176,6 @@ ctrlf/
     - `deps` - Dependencies
 
   - Examples:
-
     - `feat(extract): add support for array field extraction`
     - `fix(ui): resolve source viewing bug in review interface`
     - `docs(readme): update installation instructions`
@@ -187,7 +184,6 @@ ctrlf/
     - `chore(deps): update pydantic to 2.12.2`
 
 - Recommended loop before commit/PR:
-
   - `make check` (or run `make develop` → `make format-all` → `make test` in that order)
   - Keep CHANGELOG via conventional commits; `cliff.toml` is included for changelog tooling if you choose to generate release notes.
 

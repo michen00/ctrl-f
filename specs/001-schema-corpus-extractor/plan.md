@@ -49,7 +49,7 @@ Build a schema-driven document extraction application that accepts JSON Schema o
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### I. Test-First Development (NON-NEGOTIABLE)
 
@@ -147,8 +147,8 @@ tests/
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
+| Violation                                    | Why Needed                                                                                                                                                                                  | Simpler Alternative Rejected Because                                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Gradio web UI instead of CLI (Principle III) | Interactive review interface essential for candidate selection, source viewing, and conflict resolution. Users need to see source context, compare candidates, and make informed decisions. | Pure CLI with JSON I/O rejected because review/resolution workflow requires visual comparison of candidates and source snippets. Batch mode without review would reduce accuracy and user trust. |
 
 ## Phase 0: Research Complete

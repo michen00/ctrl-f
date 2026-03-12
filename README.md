@@ -177,7 +177,6 @@ Or create a ZIP/TAR archive of documents.
 The review interface provides comprehensive tools for reviewing and resolving extracted candidates:
 
 1. **Filter and Search Fields**:
-
    - Use the search box to filter fields by name
    - Filter by type:
      - **All**: Show all fields
@@ -185,7 +184,6 @@ The review interface provides comprehensive tools for reviewing and resolving ex
      - **Flagged (Disagreements)**: Show only fields with conflicting candidates
 
 2. **Review Candidates**: For each field, you'll see:
-
    - **Consensus Status**:
      - ✅ Consensus detected (with confidence percentage) - value is preselected
      - 🔴 Disagreement detected - multiple candidates with similar confidence, manual selection required
@@ -196,14 +194,12 @@ The review interface provides comprehensive tools for reviewing and resolving ex
    - **"Other" Text Input**: Option to enter a custom value (validated against field type)
 
 3. **View Source Context**: Click any "View source" button to see:
-
    - Document filename and path
    - Location information (page number or character range)
    - Context snippet showing the surrounding text
    - Side-by-side comparison when multiple sources exist for a candidate
 
 4. **Select Values**:
-
    - Choose a candidate from the radio button list, or
    - Enter a custom value in the "Other" field (automatically validated)
    - Custom values are type-checked against the schema field type
